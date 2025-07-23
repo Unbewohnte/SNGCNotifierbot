@@ -33,6 +33,7 @@ type TelegramConf struct {
 	Public              bool    `json:"is_public"`
 	AllowedUserIDs      []int64 `json:"allowed_user_ids"`
 	MonitoringChannelID int64   `json:"monitoring_channel_id"`
+	MonitoringThreadID  int64   `json:"monitoring_thread_id"`
 }
 
 type DBConf struct {

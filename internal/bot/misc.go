@@ -19,12 +19,13 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/mymmrac/telego"
 )
 
 // Левенштейн
@@ -88,19 +89,49 @@ func (bot *Bot) findSimilarCommands(input string) []string {
 	return suggestions
 }
 
-func (bot *Bot) sendError(chatID int64, text string, replyTo int) {
-	msg := tgbotapi.NewMessage(chatID, "❌ "+text)
-	msg.ReplyToMessageID = replyTo
-	bot.api.Send(msg)
+func (bot *Bot) sendMessage(chatID int64, text string) {
+	params := &telego.SendMessageParams{
+		ChatID: telego.ChatID{
+			ID: chatID,
+		},
+		Text:      text,
+		ParseMode: "Markdown",
+	}
+
+	bot.api.SendMessage(context.Background(), params)
 }
 
-func (bot *Bot) sendSuccess(chatID int64, text string, replyTo int) {
-	msg := tgbotapi.NewMessage(chatID, "✅ "+text)
-	msg.ReplyToMessageID = replyTo
-	bot.api.Send(msg)
+func (bot *Bot) answerBack(message *telego.Message, text string, reply bool) {
+	params := &telego.SendMessageParams{
+		ChatID: telego.ChatID{
+			ID: message.Chat.ID,
+		},
+		Text:      text,
+		ParseMode: "Markdown",
+	}
+
+	if message.MessageThreadID != 0 {
+		params.MessageThreadID = message.MessageThreadID
+	}
+
+	if reply {
+		params.ReplyParameters = &telego.ReplyParameters{
+			MessageID: message.MessageID,
+		}
+	}
+
+	bot.api.SendMessage(context.Background(), params)
 }
 
-func (bot *Bot) sendCommandSuggestions(chatID int64, input string) {
+func (bot *Bot) sendError(message *telego.Message, text string) {
+	bot.answerBack(message, "❌ "+text, true)
+}
+
+func (bot *Bot) sendSuccess(message *telego.Message, text string) {
+	bot.answerBack(message, "✅ "+text, true)
+}
+
+func (bot *Bot) sendCommandSuggestions(msg *telego.Message, input string) {
 	suggestions := bot.findSimilarCommands(input)
 	if len(suggestions) == 0 {
 		return
@@ -115,9 +146,7 @@ func (bot *Bot) sendCommandSuggestions(chatID int64, input string) {
 	}
 	message += "\nДля справки используйте `help [команда](опционально)`"
 
-	msg := tgbotapi.NewMessage(chatID, message)
-	msg.ParseMode = "Markdown"
-	bot.api.Send(msg)
+	bot.answerBack(msg, message, true)
 }
 
 // Проверяем, является ли чат мониторируемой группой Telegram
@@ -139,44 +168,50 @@ func (bot *Bot) isMonitoredTelegramGroup(chatID int64) bool {
 	return false
 }
 
-// Обработчик комментариев в Telegram группах
-func (bot *Bot) handleTelegramComment(message *tgbotapi.Message) {
+func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 	// Пропускаем служебные сообщения и сообщения от самого бота
-	if message.From.ID == bot.api.Self.ID {
+	if msg.From != nil && msg.From.ID == bot.api.ID() {
 		return
 	}
 
 	// Формируем информацию о комментарии
-	authorName := message.From.FirstName
-	if message.From.LastName != "" {
-		authorName += " " + message.From.LastName
+	authorName := msg.From.FirstName
+	if msg.From.LastName != "" {
+		authorName += " " + msg.From.LastName
 	}
 
 	// Формируем ссылку на сообщение
 	var link string
-	if message.Chat.UserName != "" {
-		link = fmt.Sprintf("https://t.me/%s/%d", message.Chat.UserName, message.MessageID)
+	if msg.Chat.Username != "" {
+		link = fmt.Sprintf("https://t.me/%s/%d", msg.Chat.Username, msg.MessageID)
 	} else {
-		link = fmt.Sprintf("chat_id: %d, message_id: %d", message.Chat.ID, message.MessageID)
+		link = fmt.Sprintf("chat_id: %d, message_id: %d", msg.Chat.ID, msg.MessageID)
 	}
 
 	// Создаем уведомление
 	msgText := fmt.Sprintf(
-		"💬 *Новый комментарий в %s (Telegram)*:\n\n"+
+		"💬 *Новый комментарий в %s (Telegram)*:\n"+
 			"👤 *Автор*: %s\n"+
 			"📝 *Текст*: %s\n"+
 			"🔗 *Ссылка*: [Перейти к комментарию](%s)\n"+
 			"⏰ *Время*: %s",
-		message.Chat.Title,
+		msg.Chat.Title,
 		authorName,
-		message.Text,
+		msg.Text,
 		link,
-		time.Unix(int64(message.Date), 0).Format("2006-01-02 15:04"),
+		time.Unix(int64(msg.Date), 0).Format("2006-01-02 15:04"),
 	)
 
 	// Отправляем уведомление в мониторинговый канал
-	msg := tgbotapi.NewMessage(bot.conf.Telegram.MonitoringChannelID, msgText)
-	msg.ParseMode = "Markdown"
-	msg.DisableWebPagePreview = true
-	bot.api.Send(msg)
+	params := &telego.SendMessageParams{
+		ChatID:    telego.ChatID{ID: bot.conf.Telegram.MonitoringChannelID},
+		Text:      msgText,
+		ParseMode: "Markdown",
+	}
+
+	if bot.conf.Telegram.MonitoringThreadID != 0 {
+		params.MessageThreadID = int(bot.conf.Telegram.MonitoringThreadID)
+	}
+
+	bot.api.SendMessage(context.Background(), params)
 }

@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/mymmrac/telego"
 )
 
 type Command struct {
@@ -36,7 +36,7 @@ type Command struct {
 	Description string
 	Example     string
 	Group       string
-	Call        func(*tgbotapi.Message)
+	Call        func(*telego.Message)
 }
 
 func (bot *Bot) NewCommand(cmd Command) {
@@ -63,19 +63,14 @@ func constructCommandHelpMessage(command Command) string {
 	return commandHelp
 }
 
-func (bot *Bot) Help(message *tgbotapi.Message) {
+func (bot *Bot) Help(message *telego.Message) {
 	parts := strings.Split(message.Text, " ")
 	if len(parts) >= 2 {
 		// Ответить лишь по конкретной команде
 		command := bot.CommandByName(parts[1])
 		if command != nil {
 			helpMessage := constructCommandHelpMessage(*command)
-			msg := tgbotapi.NewMessage(
-				message.Chat.ID,
-				helpMessage,
-			)
-			msg.ParseMode = "Markdown"
-			bot.api.Send(msg)
+			bot.sendMessage(message.Chat.ID, helpMessage)
 			return
 		}
 	}
@@ -100,57 +95,34 @@ func (bot *Bot) Help(message *tgbotapi.Message) {
 		}
 	}
 
-	msg := tgbotapi.NewMessage(
-		message.Chat.ID,
-		helpMessage,
-	)
-	msg.ParseMode = "Markdown"
-	bot.api.Send(msg)
+	bot.sendMessage(message.Chat.ID, helpMessage)
 }
 
-func (bot *Bot) About(message *tgbotapi.Message) {
-	msg := tgbotapi.NewMessage(
-		message.Chat.ID,
-		`SNGCNOTIFIER bot - Телеграм бот для оповещения о новых комментариях под постами групп в ВКонтакте, Одноклассники и Телеграм.
+func (bot *Bot) About(message *telego.Message) {
+	txt := `SNGCNOTIFIER bot - Телеграм бот для оповещения о новых комментариях под постами групп в ВКонтакте, Одноклассники и Телеграм.
 
 Source: https://github.com/Unbewohnte/SNGCNotifierbot
-Лицензия: GPLv3`,
-	)
+Лицензия: GPLv3`
 
-	bot.api.Send(msg)
+	bot.answerBack(message, txt, true)
 }
 
-func (bot *Bot) AddUser(message *tgbotapi.Message) {
+func (bot *Bot) AddUser(message *telego.Message) {
 	parts := strings.Split(strings.TrimSpace(message.Text), " ")
 	if len(parts) < 2 {
-		msg := tgbotapi.NewMessage(
-			message.Chat.ID,
-			"ID пользователя не указан",
-		)
-		msg.ReplyToMessageID = message.MessageID
-		bot.api.Send(msg)
+		bot.answerBack(message, "ID пользователя не указан", true)
 		return
 	}
 
 	id, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		msg := tgbotapi.NewMessage(
-			message.Chat.ID,
-			"Неверный ID пользователя",
-		)
-		msg.ReplyToMessageID = message.MessageID
-		bot.api.Send(msg)
+		bot.answerBack(message, "Неверный ID пользователя", true)
 		return
 	}
 
 	for _, allowedID := range bot.conf.Telegram.AllowedUserIDs {
 		if id == allowedID {
-			msg := tgbotapi.NewMessage(
-				message.Chat.ID,
-				"Этот пользователь уже есть в списке разрешенных.",
-			)
-			msg.ReplyToMessageID = message.MessageID
-			bot.api.Send(msg)
+			bot.answerBack(message, "Этот пользователь уже есть в списке разрешенных.", true)
 			return
 		}
 	}
@@ -160,51 +132,32 @@ func (bot *Bot) AddUser(message *tgbotapi.Message) {
 	// Сохраним в файл
 	bot.conf.Update()
 
-	msg := tgbotapi.NewMessage(
-		message.Chat.ID,
-		"Пользователь успешно добавлен!",
-	)
-	msg.ReplyToMessageID = message.MessageID
-	bot.api.Send(msg)
+	bot.answerBack(message, "Пользователь успешно добавлен!", true)
 }
 
-func (bot *Bot) TogglePublicity(message *tgbotapi.Message) {
+func (bot *Bot) TogglePublicity(message *telego.Message) {
 	if bot.conf.Telegram.Public {
 		bot.conf.Telegram.Public = false
-		bot.api.Send(
-			tgbotapi.NewMessage(message.Chat.ID, "Доступ к боту теперь только у избранных."),
-		)
+		bot.answerBack(message, "Доступ к боту теперь только у избранных.", true)
 	} else {
 		bot.conf.Telegram.Public = true
-		bot.api.Send(
-			tgbotapi.NewMessage(message.Chat.ID, "Доступ к боту теперь у всех."),
-		)
+		bot.answerBack(message, "Доступ к боту теперь у всех.", true)
 	}
 
 	// Обновляем конфигурационный файл
 	bot.conf.Update()
 }
 
-func (bot *Bot) RemoveUser(message *tgbotapi.Message) {
+func (bot *Bot) RemoveUser(message *telego.Message) {
 	parts := strings.Split(strings.TrimSpace(message.Text), " ")
 	if len(parts) < 2 {
-		msg := tgbotapi.NewMessage(
-			message.Chat.ID,
-			"ID пользователя не указан",
-		)
-		msg.ReplyToMessageID = message.MessageID
-		bot.api.Send(msg)
+		bot.answerBack(message, "ID пользователя не указан", true)
 		return
 	}
 
 	id, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		msg := tgbotapi.NewMessage(
-			message.Chat.ID,
-			"Неверный ID пользователя",
-		)
-		msg.ReplyToMessageID = message.MessageID
-		bot.api.Send(msg)
+		bot.answerBack(message, "Неверный ID пользователя", true)
 		return
 	}
 
@@ -220,23 +173,18 @@ func (bot *Bot) RemoveUser(message *tgbotapi.Message) {
 
 	// Сохраним в файл
 	bot.conf.Update()
-
-	msg := tgbotapi.NewMessage(
-		message.Chat.ID,
-		"Пользователь успешно удален!",
-	)
-	msg.ReplyToMessageID = message.MessageID
-	bot.api.Send(msg)
+	bot.answerBack(message, "Пользователь успешно удален!", true)
 }
 
-func (bot *Bot) PrintConfig(message *tgbotapi.Message) {
+func (bot *Bot) PrintConfig(message *telego.Message) {
 	var response string = ""
 
 	response += "*Нынешняя конфигурация*: \n"
 	response += "\n*[ОБЩЕЕ]*:\n"
 	response += fmt.Sprintf("*Общедоступный?*: `%v`\n", bot.conf.Telegram.Public)
 	response += fmt.Sprintf("*Разрешенные пользователи*: `%+v`\n", bot.conf.Telegram.AllowedUserIDs)
-	response += fmt.Sprintf("*ID мониторинговый чат*: `%+v`\n", bot.conf.Telegram.MonitoringChannelID)
+	response += fmt.Sprintf("*Мониторинговый чат*: `%+v`\n", bot.conf.Telegram.MonitoringChannelID)
+	response += fmt.Sprintf("*Раздел:*: `%+v`\n", bot.conf.Telegram.MonitoringThreadID)
 
 	response += "\n*[СОЦИАЛЬНЫЕ СЕТИ]*:\n"
 	if bot.conf.Social.OK.Token != "" {
@@ -255,13 +203,7 @@ func (bot *Bot) PrintConfig(message *tgbotapi.Message) {
 		response += "*TG*: Токен отсутствует\n"
 	}
 
-	msg := tgbotapi.NewMessage(
-		message.Chat.ID,
-		response,
-	)
-	msg.ParseMode = "Markdown"
-	msg.ReplyToMessageID = message.MessageID
-	bot.api.Send(msg)
+	bot.answerBack(message, response, true)
 }
 
 // Вспомогательная функция для нормализации ID группы ВК
@@ -301,10 +243,10 @@ func normalizeVKGroupID(input string) (string, error) {
 	return input, nil
 }
 
-func (bot *Bot) AddGroup(message *tgbotapi.Message) {
+func (bot *Bot) AddGroup(message *telego.Message) {
 	parts := strings.Split(strings.TrimSpace(message.Text), " ")
 	if len(parts) < 3 {
-		bot.sendError(message.Chat.ID, "Неверный формат. Используйте: /addgroup <сеть> <ID группы>", message.MessageID)
+		bot.sendError(message, "Неверный формат. Используйте: /addgroup <сеть> <ID группы>")
 		return
 	}
 
@@ -314,12 +256,12 @@ func (bot *Bot) AddGroup(message *tgbotapi.Message) {
 	// Сначала проверяем, существует ли уже такая группа
 	existingGroup, err := bot.conf.GetDB().GetGroupByNetworkAndID(network, groupID)
 	if err == nil && existingGroup != nil {
-		bot.sendError(message.Chat.ID,
+		bot.sendError(message,
 			fmt.Sprintf("Эта группа уже добавлена:\nНазвание: %s\nID: %s\nДобавлена: %s",
 				existingGroup.GroupName,
 				existingGroup.GroupID,
 				existingGroup.CreatedAt.Local().Format("2006-01-02 15:04")),
-			message.MessageID)
+		)
 		return
 	}
 
@@ -329,14 +271,14 @@ func (bot *Bot) AddGroup(message *tgbotapi.Message) {
 		// Нормализуем идентификатор группы ВК
 		normalizedID, err := normalizeVKGroupID(groupID)
 		if err != nil {
-			bot.sendError(message.Chat.ID, "Неверный ID группы ВК: "+err.Error(), message.MessageID)
+			bot.sendError(message, "Неверный ID группы ВК: "+err.Error())
 			return
 		}
 
 		// Получаем информацию о группе
 		info, err := bot.social.VKClient.GetGroupInfo(context.Background(), normalizedID)
 		if err != nil {
-			bot.sendError(message.Chat.ID, fmt.Sprintf("Ошибка проверки группы: %v", err), message.MessageID)
+			bot.sendError(message, fmt.Sprintf("Ошибка проверки группы: %v", err))
 			return
 		}
 
@@ -346,7 +288,7 @@ func (bot *Bot) AddGroup(message *tgbotapi.Message) {
 		}
 		extraDataJSON, err := json.Marshal(extraData)
 		if err != nil {
-			bot.sendError(message.Chat.ID, "Ошибка формирования данных группы: "+err.Error(), message.MessageID)
+			bot.sendError(message, "Ошибка формирования данных группы: "+err.Error())
 			return
 		}
 
@@ -366,7 +308,7 @@ func (bot *Bot) AddGroup(message *tgbotapi.Message) {
 		// Получаем информацию о группе
 		info, err := bot.social.OKClient.GetGroupInfo(context.Background(), groupID)
 		if err != nil {
-			bot.sendError(message.Chat.ID, fmt.Sprintf("Ошибка проверки группы: %v", err), message.MessageID)
+			bot.sendError(message, fmt.Sprintf("Ошибка проверки группы: %v", err))
 			return
 		}
 
@@ -376,7 +318,7 @@ func (bot *Bot) AddGroup(message *tgbotapi.Message) {
 		}
 		extraDataJSON, err := json.Marshal(extraData)
 		if err != nil {
-			bot.sendError(message.Chat.ID, "Ошибка формирования данных группы: "+err.Error(), message.MessageID)
+			bot.sendError(message, "Ошибка формирования данных группы: "+err.Error())
 			return
 		}
 
@@ -390,7 +332,7 @@ func (bot *Bot) AddGroup(message *tgbotapi.Message) {
 	case "tg":
 		// Для Telegram используем ID чата из текущего сообщения
 		if message.Chat.ID == 0 {
-			bot.sendError(message.Chat.ID, "Не удалось определить ID группы", message.MessageID)
+			bot.sendError(message, "Не удалось определить ID группы")
 			return
 		}
 
@@ -402,20 +344,20 @@ func (bot *Bot) AddGroup(message *tgbotapi.Message) {
 			ExtraData: "{}",
 		}
 	default:
-		bot.sendError(message.Chat.ID, "Неподдерживаемая социальная сеть", message.MessageID)
+		bot.sendError(message, "Неподдерживаемая социальная сеть")
 		return
 	}
 
 	id, err := bot.conf.GetDB().AddGroup(&group)
 	if err != nil {
-		bot.sendError(message.Chat.ID, "Ошибка добавления группы: "+err.Error(), message.MessageID)
+		bot.sendError(message, "Ошибка добавления группы: "+err.Error())
 		return
 	}
 
-	bot.sendSuccess(message.Chat.ID, fmt.Sprintf(
+	bot.sendSuccess(message, fmt.Sprintf(
 		"Группа добавлена:\nНазвание: %s\nID: %s\nID в базе: %d",
 		group.GroupName, group.GroupID, id,
-	), message.MessageID)
+	))
 }
 
 // Извлекаем ID группы из URL Одноклассников
@@ -432,10 +374,10 @@ func extractOKGroupID(url string) string {
 	return url
 }
 
-func (bot *Bot) RemoveGroup(message *tgbotapi.Message) {
+func (bot *Bot) RemoveGroup(message *telego.Message) {
 	parts := strings.Split(strings.TrimSpace(message.Text), " ")
 	if len(parts) < 3 {
-		bot.sendError(message.Chat.ID, "Неверный формат. Используйте: /rmgroup <сеть> <ID группы>", message.MessageID)
+		bot.sendError(message, "Неверный формат. Используйте: /rmgroup <сеть> <ID группы>")
 		return
 	}
 
@@ -445,31 +387,29 @@ func (bot *Bot) RemoveGroup(message *tgbotapi.Message) {
 	// Сначала проверяем, существует ли такая группа
 	existingGroup, err := bot.conf.GetDB().GetGroupByNetworkAndID(network, groupID)
 	if err != nil || existingGroup == nil {
-		bot.sendError(message.Chat.ID,
-			fmt.Sprintf("Группа с ID %s не найдена в %s", groupID, network),
-			message.MessageID)
+		bot.sendError(message,
+			fmt.Sprintf("Группа с ID %s не найдена в %s", groupID, network))
 		return
 	}
 
 	err = bot.conf.GetDB().RemoveGroup(network, groupID)
 	if err != nil {
-		bot.sendError(message.Chat.ID, "Ошибка удаления группы: "+err.Error(), message.MessageID)
+		bot.sendError(message, "Ошибка удаления группы: "+err.Error())
 		return
 	}
 
-	bot.sendSuccess(message.Chat.ID, "Группа успешно удалена", message.MessageID)
+	bot.sendSuccess(message, "Группа успешно удалена")
 }
 
-func (bot *Bot) ListGroups(message *tgbotapi.Message) {
+func (bot *Bot) ListGroups(message *telego.Message) {
 	groups, err := bot.conf.GetDB().GetGroups()
 	if err != nil {
-		bot.sendError(message.Chat.ID, "Ошибка получения групп: "+err.Error(), message.MessageID)
+		bot.sendError(message, "Ошибка получения групп: "+err.Error())
 		return
 	}
 
 	if len(groups) == 0 {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "Нет отслеживаемых групп")
-		bot.api.Send(msg)
+		bot.answerBack(message, "Нет отслеживаемых групп", true)
 		return
 	}
 
@@ -487,30 +427,26 @@ func (bot *Bot) ListGroups(message *tgbotapi.Message) {
 		)
 	}
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, response.String())
-	msg.ParseMode = "Markdown"
-	bot.api.Send(msg)
+	bot.answerBack(message, response.String(), true)
 }
 
-func (bot *Bot) ChatID(message *tgbotapi.Message) {
-	msg := tgbotapi.NewMessage(
-		message.Chat.ID,
+func (bot *Bot) ChatID(message *telego.Message) {
+	bot.answerBack(message,
 		fmt.Sprintf(
-			"ID Чата: `%d`",
+			"ID Чата: `%d`\nID раздела: `%d`",
 			message.Chat.ID,
+			message.MessageThreadID,
 		),
+		true,
 	)
-	msg.ParseMode = "Markdown"
-	bot.api.Send(msg)
 }
 
-func (bot *Bot) SetChatID(message *tgbotapi.Message) {
+func (bot *Bot) SetChatID(message *telego.Message) {
 	parts := strings.Split(strings.TrimSpace(message.Text), " ")
 	if len(parts) < 2 {
 		bot.sendError(
-			message.Chat.ID,
+			message,
 			"Неверный формат.",
-			message.MessageID,
 		)
 		return
 	}
@@ -519,9 +455,8 @@ func (bot *Bot) SetChatID(message *tgbotapi.Message) {
 	newID, err := strconv.ParseInt(newIDStr, 10, 64)
 	if err != nil {
 		bot.sendError(
-			message.Chat.ID,
+			message,
 			"Указан неверный ID",
-			message.MessageID,
 		)
 		return
 	}
@@ -529,9 +464,31 @@ func (bot *Bot) SetChatID(message *tgbotapi.Message) {
 	bot.conf.Telegram.MonitoringChannelID = newID
 	bot.conf.Update()
 
-	msg := tgbotapi.NewMessage(
-		message.Chat.ID,
-		"ID Чата изменено",
-	)
-	bot.api.Send(msg)
+	bot.answerBack(message, "ID Чата изменено", true)
+}
+
+func (bot *Bot) SetThreadID(message *telego.Message) {
+	parts := strings.Split(strings.TrimSpace(message.Text), " ")
+	if len(parts) < 2 {
+		bot.sendError(
+			message,
+			"Неверный формат.",
+		)
+		return
+	}
+
+	newIDStr := parts[1]
+	newID, err := strconv.ParseInt(newIDStr, 10, 64)
+	if err != nil {
+		bot.sendError(
+			message,
+			"Указан неверный ID",
+		)
+		return
+	}
+
+	bot.conf.Telegram.MonitoringThreadID = newID
+	bot.conf.Update()
+
+	bot.answerBack(message, "ID Раздела изменено", true)
 }

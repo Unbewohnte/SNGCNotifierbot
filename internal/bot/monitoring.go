@@ -26,7 +26,7 @@ import (
 
 	"Unbewohnte/SNGCNOTIFIERbot/internal/db"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/mymmrac/telego"
 )
 
 func (bot *Bot) StartMonitoring() {
@@ -96,11 +96,18 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 			time.Unix(comment.Timestamp, 0).Format("2006-01-02 15:04"),
 		)
 
-		msg := tgbotapi.NewMessage(bot.conf.Telegram.MonitoringChannelID, msgText)
-		msg.ParseMode = "Markdown"
-		msg.DisableWebPagePreview = true
+		params := &telego.SendMessageParams{
+			ChatID:    telego.ChatID{ID: bot.conf.Telegram.MonitoringChannelID},
+			Text:      msgText,
+			ParseMode: "Markdown",
+		}
 
-		if _, err := bot.api.Send(msg); err != nil {
+		// Указываем ID топика, если он установлен
+		if bot.conf.Telegram.MonitoringThreadID != 0 {
+			params.MessageThreadID = int(bot.conf.Telegram.MonitoringThreadID)
+		}
+
+		if _, err := bot.api.SendMessage(context.Background(), params); err != nil {
 			log.Printf("Ошибка отправки уведомления: %v", err)
 		}
 	}

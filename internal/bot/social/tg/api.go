@@ -16,21 +16,21 @@
    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package telegram
+package tg
 
 import (
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social"
 	"Unbewohnte/SNGCNOTIFIERbot/internal/db"
 	"context"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/mymmrac/telego"
 )
 
 type Client struct {
-	bot *tgbotapi.BotAPI
+	bot *telego.Bot
 }
 
-func NewClient(bot *tgbotapi.BotAPI) *Client {
+func NewClient(bot *telego.Bot) *Client {
 	return &Client{
 		bot: bot,
 	}

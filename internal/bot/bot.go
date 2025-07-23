@@ -21,24 +21,25 @@ package bot
 import (
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social"
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social/ok"
-	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social/telegram"
+	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social/tg"
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social/vk"
+	"context"
 	"log"
 	"strings"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/mymmrac/telego"
 )
 
 type Bot struct {
-	api      *tgbotapi.BotAPI
+	api      *telego.Bot
 	conf     *Config
 	commands []Command
 	social   *social.SocialManager
 }
 
 func NewBot(config *Config) (*Bot, error) {
-	api, err := tgbotapi.NewBotAPI(config.Telegram.ApiToken)
+	api, err := telego.NewBot(config.Telegram.ApiToken, telego.WithDefaultLogger(false, false))
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +53,7 @@ func NewBot(config *Config) (*Bot, error) {
 			config.Social.OK.SecretKey,
 			config.Social.OK.AppID,
 		),
-		TGClient: telegram.NewClient(api),
+		TGClient: tg.NewClient(api),
 	}
 
 	return &Bot{
@@ -148,28 +149,50 @@ func (bot *Bot) Init() {
 		Group:       "Общее",
 		Call:        bot.SetChatID,
 	})
+
+	bot.NewCommand(Command{
+		Name:        "setthreadid",
+		Description: "Сменить ID раздела для отправки сообщений о комментариях",
+		Group:       "Общее",
+		Call:        bot.SetThreadID,
+	})
 }
 
 func (bot *Bot) Start() error {
 	bot.Init()
 
-	log.Printf("Бот авторизован как %s", bot.api.Self.UserName)
+	log.Printf("Бот авторизован как %s", bot.api.Username())
 
 	bot.StartMonitoring()
-
 	startTime := time.Now()
 	retryDelay := 5 * time.Second
+
 	for {
-		u := tgbotapi.NewUpdate(0)
-		u.Timeout = 60
-		updates := bot.api.GetUpdatesChan(u)
+		// Получаем обновления через long polling
+		updates, err := bot.api.UpdatesViaLongPolling(
+			context.Background(),
+			&telego.GetUpdatesParams{
+				Timeout: 60,
+			},
+		)
+		if err != nil {
+			log.Printf("Ошибка получения обновлений: %v. Переподключение через %v...", err, retryDelay)
+			time.Sleep(retryDelay)
+			if retryDelay < 300*time.Second {
+				retryDelay *= 2
+			}
+			continue
+		}
+
+		// Сбрасываем задержку переподключения при успешном соединении
+		retryDelay = 5 * time.Second
 
 		for update := range updates {
 			if update.Message == nil {
 				continue
 			}
 
-			go func(message *tgbotapi.Message) {
+			go func(message *telego.Message) {
 				// Пропускаем сообщения, пришедшие до старта бота
 				if time.Unix(int64(message.Date), 0).Before(startTime) {
 					return
@@ -180,7 +203,7 @@ func (bot *Bot) Start() error {
 					bot.handleTelegramComment(message)
 				}
 
-				// Проверка на возможность дальнейшего общения с данным пользователем
+				// Проверка доступа
 				if !bot.conf.Telegram.Public {
 					var allowed bool = false
 					for _, allowedID := range bot.conf.Telegram.AllowedUserIDs {
@@ -191,44 +214,30 @@ func (bot *Bot) Start() error {
 					}
 
 					if !allowed {
-						// Не пропускаем дальше
-						msg := tgbotapi.NewMessage(
-							message.Chat.ID,
-							"Вам не разрешено пользоваться этим ботом!",
-						)
-						bot.api.Send(msg)
-
+						bot.answerBack(message, "Вам не разрешено пользоваться этим ботом!", true)
 						if bot.conf.Debug {
 							log.Printf("Не допустили к общению пользователя %v", message.From.ID)
 						}
-
 						return
 					}
 				}
 
-				log.Printf("[%s] %s", message.From.UserName, message.Text)
+				log.Printf("[%s] %s", message.From.Username, message.Text)
 
-				// Обработать команды
+				// Обработка команд
 				message.Text = strings.TrimSpace(message.Text)
 				for _, command := range bot.commands {
 					if strings.HasPrefix(strings.ToLower(message.Text), "/"+command.Name) {
 						go command.Call(message)
-						return // Дальше не продолжаем
+						return
 					}
 				}
 
-				// Неверно введенная команда
-				bot.sendCommandSuggestions(
-					message.Chat.ID,
-					strings.ToLower(message.Text),
-				)
+				// Неверная команда
+				bot.sendCommandSuggestions(message, strings.ToLower(message.Text))
 			}(update.Message)
 		}
 
 		log.Println("Соединение с Telegram потеряно. Переподключение...")
-		time.Sleep(retryDelay)
-		if retryDelay < 300*time.Second {
-			retryDelay *= 2
-		}
 	}
 }
