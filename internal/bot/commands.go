@@ -111,8 +111,10 @@ func (bot *Bot) Help(message *tgbotapi.Message) {
 func (bot *Bot) About(message *tgbotapi.Message) {
 	msg := tgbotapi.NewMessage(
 		message.Chat.ID,
-		`SNGCNOTIFIER bot
-`,
+		`SNGCNOTIFIER bot - Телеграм бот для оповещения о новых комментариях под постами групп в ВКонтакте, Одноклассники и Телеграм.
+
+Source: https://github.com/Unbewohnte/SNGCNotifierbot
+Лицензия: GPLv3`,
 	)
 
 	bot.api.Send(msg)
