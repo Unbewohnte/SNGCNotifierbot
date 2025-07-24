@@ -156,6 +156,13 @@ func (bot *Bot) Init() {
 		Group:       "Общее",
 		Call:        bot.SetThreadID,
 	})
+
+	bot.NewCommand(Command{
+		Name:        "toggleempty",
+		Description: "Включить или выключить оповещения для пустых комментариев",
+		Group:       "Общее",
+		Call:        bot.ToggleAllowEmptyComments,
+	})
 }
 
 func (bot *Bot) Start() error {

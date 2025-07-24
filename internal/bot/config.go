@@ -41,26 +41,33 @@ type DBConf struct {
 	db   *db.DB
 }
 
+type VKConf struct {
+	Token string `json:"token"`
+}
+
+type OKConf struct {
+	Token     string `json:"token"`
+	PublicKey string `json:"public_key"`
+	SecretKey string `json:"secret_key"`
+	AppID     string `json:"app_id"`
+}
+
+type TGConf struct {
+	Token string `json:"token"`
+}
+
 type SocialConfig struct {
-	VK struct {
-		Token string `json:"token"`
-	} `json:"vk"`
-	OK struct {
-		Token     string `json:"token"`
-		PublicKey string `json:"public_key"`
-		SecretKey string `json:"secret_key"`
-		AppID     string `json:"app_id"`
-	} `json:"ok"`
-	Telegram struct {
-		Token string `json:"token"`
-	} `json:"telegram"`
+	VK VKConf `json:"vk"`
+	OK OKConf `json:"ok"`
+	TG TGConf `json:"telegram"`
 }
 
 type Config struct {
-	Telegram TelegramConf `json:"telegram"`
-	Debug    bool         `json:"debug"`
-	DB       DBConf       `json:"database"`
-	Social   SocialConfig `json:"socials"`
+	Telegram           TelegramConf `json:"telegram"`
+	Debug              bool         `json:"debug"`
+	DB                 DBConf       `json:"database"`
+	Social             SocialConfig `json:"socials"`
+	AllowEmptyComments bool         `json:"allow_empty_comments"`
 }
 
 func (c *Config) OpenDB() (*db.DB, error) {
@@ -86,7 +93,22 @@ func DefaultConfig() *Config {
 		DB: DBConf{
 			File: "DB.sqlite3",
 		},
-		Debug: false,
+		Social: SocialConfig{
+			VK: VKConf{
+				Token: "vk_user_token",
+			},
+			OK: OKConf{
+				Token:     "token",
+				PublicKey: "pub_key",
+				SecretKey: "secret_key",
+				AppID:     "app_id",
+			},
+			TG: TGConf{
+				Token: "token",
+			},
+		},
+		Debug:              false,
+		AllowEmptyComments: true,
 	}
 }
 

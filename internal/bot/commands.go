@@ -185,6 +185,7 @@ func (bot *Bot) PrintConfig(message *telego.Message) {
 	response += fmt.Sprintf("*Разрешенные пользователи*: `%+v`\n", bot.conf.Telegram.AllowedUserIDs)
 	response += fmt.Sprintf("*Мониторинговый чат*: `%+v`\n", bot.conf.Telegram.MonitoringChannelID)
 	response += fmt.Sprintf("*Раздел:*: `%+v`\n", bot.conf.Telegram.MonitoringThreadID)
+	response += fmt.Sprintf("*Пустые комментарии разрешены?:*: `%+v`\n", bot.conf.AllowEmptyComments)
 
 	response += "\n*[СОЦИАЛЬНЫЕ СЕТИ]*:\n"
 	if bot.conf.Social.OK.Token != "" {
@@ -197,7 +198,7 @@ func (bot *Bot) PrintConfig(message *telego.Message) {
 	} else {
 		response += "*VK*: Токен отсутствует\n"
 	}
-	if bot.conf.Social.Telegram.Token != "" {
+	if bot.conf.Social.TG.Token != "" {
 		response += "*TG*: Токен имеется\n"
 	} else {
 		response += "*TG*: Токен отсутствует\n"
@@ -491,4 +492,17 @@ func (bot *Bot) SetThreadID(message *telego.Message) {
 	bot.conf.Update()
 
 	bot.answerBack(message, "ID Раздела изменено", true)
+}
+
+func (bot *Bot) ToggleAllowEmptyComments(message *telego.Message) {
+	if bot.conf.AllowEmptyComments {
+		bot.conf.AllowEmptyComments = false
+		bot.answerBack(message, "Не оповещаем о пустых комментариях.", true)
+	} else {
+		bot.conf.AllowEmptyComments = true
+		bot.answerBack(message, "Оповещаем о пустых комментариях.", true)
+	}
+
+	// Обновляем конфигурационный файл
+	bot.conf.Update()
 }
