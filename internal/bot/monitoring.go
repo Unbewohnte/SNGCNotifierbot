@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"Unbewohnte/SNGCNOTIFIERbot/internal/db"
@@ -80,8 +81,33 @@ func (bot *Bot) checkGroupComments(group db.MonitoredGroup) ([]db.Comment, error
 	}
 }
 
+// processCommentText обрабатывает текст комментария, заменяя специальные теги на понятные сообщения
+func processCommentText(text string) string {
+	if text == "" {
+		return "((Пустой текст, возможно файл или стикер))"
+	}
+
+	// Проверяем наличие тегов вложения
+	if strings.HasPrefix(text, "#ud") {
+		// Пример: #ud6f8934c00#192:192s#
+		return "((Сообщение содержит стикер или вложенный файл))"
+	}
+
+	if strings.Contains(text, "Сообщение содержит прикрепленные файлы") {
+		return "((Сообщение содержит прикрепленные файлы))"
+	}
+
+	if strings.Contains(text, "media_url") {
+		return "((Сообщение содержит медиа))"
+	}
+
+	return text
+}
+
 func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment) {
 	for _, comment := range comments {
+		processedText := processCommentText(comment.Text)
+
 		msgText := fmt.Sprintf(
 			"💬 *Новый комментарий в %s (%s)*:\n\n"+
 				"👤 *Автор*: %s\n"+
@@ -91,7 +117,7 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 			group.GroupName,
 			group.Network,
 			comment.Author,
-			comment.Text,
+			processedText,
 			comment.PostURL,
 			time.Unix(comment.Timestamp, 0).Format("2006-01-02 15:04"),
 		)
