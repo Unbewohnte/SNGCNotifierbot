@@ -20,6 +20,7 @@ package main
 
 import (
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot"
+	"io"
 	"log"
 	"os"
 )
@@ -31,7 +32,12 @@ var (
 )
 
 func init() {
-	var err error
+	logfile, err := os.Create("logs.txt")
+	if err != nil {
+		log.Fatal("Failed to create logs file: " + err.Error())
+	}
+	log.SetOutput(io.MultiWriter(logfile, os.Stdout))
+
 	CONFIG, err = bot.ConfigFrom(CONFIG_NAME)
 	if err != nil {
 		log.Println("Не удалось открыть конфигурационный файл: " + err.Error() + ". Создаем новый...")
