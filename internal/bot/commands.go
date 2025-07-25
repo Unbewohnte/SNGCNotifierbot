@@ -186,7 +186,7 @@ func (bot *Bot) PrintConfig(message *telego.Message) {
 	response += fmt.Sprintf("*Разрешенные пользователи*: `%+v`\n", bot.conf.Telegram.AllowedUserIDs)
 	response += fmt.Sprintf("*Мониторинговый чат*: `%+v`\n", bot.conf.Telegram.MonitoringChannelID)
 	response += fmt.Sprintf("*Раздел:*: `%+v`\n", bot.conf.Telegram.MonitoringThreadID)
-	response += fmt.Sprintf("*Пустые комментарии разрешены?:*: `%+v`\n", bot.conf.AllowEmptyComments)
+	response += fmt.Sprintf("*Пустые комментарии разрешены?*: `%+v`\n", bot.conf.AllowEmptyComments)
 
 	response += "\n*[СОЦИАЛЬНЫЕ СЕТИ]*:\n"
 	if bot.conf.Social.OK.Token != "" {
@@ -204,6 +204,9 @@ func (bot *Bot) PrintConfig(message *telego.Message) {
 	} else {
 		response += "*TG*: Токен отсутствует\n"
 	}
+
+	response += "\n*[Расписание]*:\n"
+	response += fmt.Sprintf("*Оповещения по расписанию включены?*: `%+v`\n", bot.conf.Schedule.Enabled)
 
 	bot.answerBack(message, response, true)
 }

@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -96,9 +95,12 @@ func (bot *Bot) sendMessage(chatID int64, threadID int, text string) {
 		ChatID: telego.ChatID{
 			ID: chatID,
 		},
-		MessageThreadID: threadID,
-		Text:            text,
-		ParseMode:       "Markdown",
+		Text:      text,
+		ParseMode: "Markdown",
+	}
+
+	if threadID != 0 {
+		params.MessageThreadID = threadID
 	}
 
 	bot.api.SendMessage(context.Background(), params)
@@ -109,9 +111,12 @@ func (bot *Bot) answerBack(message *telego.Message, text string, reply bool) {
 		ChatID: telego.ChatID{
 			ID: message.Chat.ID,
 		},
-		MessageThreadID: message.MessageThreadID,
-		Text:            text,
-		ParseMode:       "Markdown",
+		Text:      text,
+		ParseMode: "Markdown",
+	}
+
+	if message.MessageThreadID != 0 {
+		params.MessageThreadID = message.MessageThreadID
 	}
 
 	if reply {
@@ -157,11 +162,7 @@ func (bot *Bot) isMonitoredTelegramGroup(chatID int64) bool {
 	}
 
 	for _, group := range groups {
-		groupID, err := strconv.ParseInt(group.GroupID, 10, 64)
-		if err != nil {
-			continue
-		}
-		if groupID == chatID {
+		if group.GroupID == fmt.Sprintf("tg-%d", chatID) {
 			return true
 		}
 	}

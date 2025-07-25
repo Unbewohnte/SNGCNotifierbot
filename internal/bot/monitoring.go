@@ -155,7 +155,7 @@ func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 	// Формируем комментарий
 	comment := db.Comment{
 		ID:         fmt.Sprintf("%d", msg.MessageID),
-		CommentID:  fmt.Sprintf("tg-%d", msg.MessageID),
+		CommentID:  fmt.Sprintf("%d", msg.MessageID),
 		Author:     formatUserName(msg.From),
 		Text:       msg.Text,
 		Timestamp:  int64(msg.Date),
