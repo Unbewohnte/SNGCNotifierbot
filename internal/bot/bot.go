@@ -203,8 +203,9 @@ func (bot *Bot) Start() error {
 
 	bot.StartMonitoring(bot.conf.CheckIntervalMinutes)
 
-	startTime := time.Now()
 	retryDelay := 5 * time.Second
+
+	var lastUpdateID int = 0 // Будем хранить ID последнего обработанного обновления
 
 	for {
 		// Получаем обновления через long polling
@@ -212,6 +213,7 @@ func (bot *Bot) Start() error {
 			context.Background(),
 			&telego.GetUpdatesParams{
 				Timeout: 60,
+				Offset:  lastUpdateID + 1,
 			},
 		)
 		if err != nil {
@@ -227,19 +229,20 @@ func (bot *Bot) Start() error {
 		retryDelay = 5 * time.Second
 
 		for update := range updates {
+			// Обновляем lastUpdateID
+			if update.UpdateID > lastUpdateID {
+				lastUpdateID = update.UpdateID
+			}
+
 			if update.Message == nil {
 				continue
 			}
 
 			go func(message *telego.Message) {
-				// Пропускаем сообщения, пришедшие до старта бота
-				if time.Unix(int64(message.Date), 0).Before(startTime) {
-					return
-				}
-
 				// Обработка комментариев в Telegram группах
 				if bot.isMonitoredTelegramGroup(message.Chat.ID) {
 					bot.handleTelegramComment(message)
+					return
 				}
 
 				// Команда ли это
