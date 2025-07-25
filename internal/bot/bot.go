@@ -264,7 +264,7 @@ func (bot *Bot) Start() error {
 				// Обработка команд
 				message.Text = strings.TrimSpace(message.Text)
 				for _, command := range bot.commands {
-					if strings.HasPrefix(strings.ToLower(message.Text), command.Name) {
+					if strings.HasPrefix(strings.ToLower(message.Text), "/"+command.Name) {
 						go command.Call(message)
 						return
 					}
