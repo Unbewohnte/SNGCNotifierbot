@@ -31,6 +31,8 @@ import (
 )
 
 func (bot *Bot) StartMonitoring(intervalMins int) {
+	log.Printf("Запускаем мониторинг с интервалом %d минут", intervalMins)
+
 	go func(intervalMins int) {
 		ticker := time.NewTicker(time.Duration(intervalMins) * time.Minute)
 		defer ticker.Stop()
@@ -41,6 +43,7 @@ func (bot *Bot) StartMonitoring(intervalMins int) {
 				log.Printf("Ошибка получения групп: %v", err)
 				continue
 			}
+			log.Printf("Проверка %d групп...", len(groups))
 
 			for _, group := range groups {
 				comments, err := bot.checkGroupComments(group)
