@@ -194,6 +194,13 @@ func (bot *Bot) Init() {
 		Group:       "Расписание",
 		Call:        bot.ToggleEnableSchedule,
 	})
+
+	bot.NewCommand(Command{
+		Name:        "silence",
+		Description: "Перенаправлять оповещения в невалидный канал (до последующей перенастройки)",
+		Group:       "Общее",
+		Call:        bot.Silence,
+	})
 }
 
 func (bot *Bot) Start() error {

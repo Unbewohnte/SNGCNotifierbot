@@ -671,3 +671,10 @@ func (bot *Bot) ToggleEnableSchedule(message *telego.Message) {
 	// Обновляем конфигурационный файл
 	bot.conf.Update()
 }
+
+// Перенаправлять все сообщения в невалидный канал (до перенастройки).
+func (bot *Bot) Silence(message *telego.Message) {
+	bot.conf.Telegram.MonitoringChannelID = 0
+	bot.conf.Telegram.MonitoringThreadID = 0
+	bot.conf.Update()
+}
