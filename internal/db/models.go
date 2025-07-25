@@ -33,12 +33,14 @@ type MonitoredGroup struct {
 
 // Модель комментария
 type Comment struct {
-	ID        string `db:"id"`
-	GroupID   int64  `db:"group_id"`   // Ссылка на группу
-	Network   string `db:"network"`    // Соцсеть
-	CommentID string `db:"comment_id"` // ID комментария в соцсети
-	Author    string `db:"author"`
-	Text      string `db:"text"`
-	Timestamp int64  `db:"timestamp"` // Unix timestamp
-	PostURL   string `db:"post_url"`
+	ID         string `db:"id"`
+	GroupID    int64  `db:"group_id"`   // Ссылка на группу
+	Network    string `db:"network"`    // Соцсеть
+	CommentID  string `db:"comment_id"` // ID комментария в соцсети
+	Author     string `db:"author"`
+	Text       string `db:"text"`
+	Timestamp  int64  `db:"timestamp"` // Unix timestamp
+	PostURL    string `db:"post_url"`
+	IsPending  bool   `db:"is_pending"`
+	ReceivedAt int64  `db:"received_at"` // Unix timestamp
 }

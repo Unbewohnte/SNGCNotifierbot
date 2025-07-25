@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -505,4 +506,152 @@ func (bot *Bot) ToggleAllowEmptyComments(message *telego.Message) {
 
 	// Обновляем конфигурационный файл
 	bot.conf.Update()
+}
+
+func (bot *Bot) ShowSchedule(message *telego.Message) {
+	schedule := bot.conf.Schedule
+
+	status := "❌ отключено"
+	if schedule.Enabled {
+		status = "✅ включено"
+	}
+
+	response := fmt.Sprintf(
+		"*Расписание уведомлений*:\n\n"+
+			"Статус: %s\n"+
+			"Дни недели: %s\n"+
+			"Время: %s - %s\n"+
+			"Часовой пояс: %s",
+		status,
+		strings.Join(schedule.DaysOfWeek, ", "),
+		schedule.StartTime,
+		schedule.EndTime,
+		schedule.Timezone,
+	)
+
+	response += "\n\n```\n"
+	days := []string{"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+	for _, day := range days {
+		active := " "
+		for _, activeDay := range schedule.DaysOfWeek {
+			if day == activeDay {
+				active = "✓"
+				break
+			}
+		}
+		response += fmt.Sprintf("%s: [%s] %s - %s\n",
+			day,
+			active,
+			schedule.StartTime,
+			schedule.EndTime,
+		)
+	}
+	response += "```"
+
+	bot.sendMessage(message.Chat.ID, response)
+}
+
+func (bot *Bot) SetSchedule(message *telego.Message) {
+	parts := strings.Split(strings.TrimSpace(message.Text), " ")
+	if len(parts) < 6 {
+		bot.sendError(message,
+			"Неверный формат. Используйте: /setschedule <enabled|disabled> <дни> <начало> <конец> <часовой пояс>\nПример: /setschedule enabled mon,tue,wed,thu,fri 08:00 18:00 Europe/Moscow",
+		)
+		return
+	}
+
+	// Парсим статус
+	status := strings.ToLower(parts[1])
+	if status != "enabled" && status != "disabled" {
+		bot.sendError(
+			message,
+			"Статус должен быть 'enabled' или 'disabled'",
+		)
+		return
+	}
+
+	// Парсим дни недели
+	days := strings.Split(parts[2], ",")
+	validDays := map[string]bool{"mon": true, "tue": true, "wed": true, "thu": true, "fri": true, "sat": true, "sun": true}
+	for _, day := range days {
+		if !validDays[strings.ToLower(day)] {
+			bot.sendError(
+				message,
+				fmt.Sprintf("Недопустимый день недели: %s. Допустимые: mon,tue,wed,thu,fri,sat,sun", day),
+			)
+			return
+		}
+	}
+
+	// Парсим время
+	startTime := parts[3]
+	endTime := parts[4]
+	if !isValidTime(startTime) || !isValidTime(endTime) {
+		bot.sendError(
+			message,
+			"Неверный формат времени. Используйте HH:MM",
+		)
+		return
+	}
+
+	// Проверяем, что начало раньше конца
+	if startTime > endTime {
+		bot.sendError(
+			message,
+			"Время начала должно быть раньше времени окончания",
+		)
+		return
+	}
+
+	// Часовой пояс
+	timezone := parts[5]
+	if timezone == "auto" {
+		// Определяем часовой пояс сервера
+		zone, offset := time.Now().Zone()
+		timezone = fmt.Sprintf("Etc/GMT%+d", -offset/3600)
+		log.Printf("Автоматический часовой пояс: %s (%s)", timezone, zone)
+	} else if _, err := time.LoadLocation(timezone); err != nil {
+		bot.sendError(message,
+			fmt.Sprintf("Неверный часовой пояс: %s. Пример: Europe/Moscow", timezone),
+		)
+		return
+	}
+
+	// Обновляем конфиг
+	bot.conf.Schedule.Enabled = (status == "enabled")
+	bot.conf.Schedule.DaysOfWeek = days
+	bot.conf.Schedule.StartTime = startTime
+	bot.conf.Schedule.EndTime = endTime
+	bot.conf.Schedule.Timezone = timezone
+
+	// Сохраняем
+	if err := bot.conf.Update(); err != nil {
+		bot.sendError(
+			message,
+			"Ошибка сохранения расписания: "+err.Error(),
+		)
+		return
+	}
+
+	bot.sendSuccess(message, "Расписание успешно обновлено!")
+}
+
+// Вспомогательная функция для проверки формата времени
+func isValidTime(t string) bool {
+	parts := strings.Split(t, ":")
+	if len(parts) != 2 {
+		return false
+	}
+
+	hour, err := strconv.Atoi(parts[0])
+	if err != nil || hour < 0 || hour > 23 {
+		return false
+	}
+
+	minute, err := strconv.Atoi(parts[1])
+	if err != nil || minute < 0 || minute > 59 {
+		return false
+	}
+
+	return true
 }

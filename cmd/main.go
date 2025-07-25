@@ -20,9 +20,14 @@ package main
 
 import (
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot"
+	"flag"
 	"io"
 	"log"
 	"os"
+)
+
+var (
+	migrate *bool = flag.Bool("migrate", false, "Call current migrate function on start")
 )
 
 const CONFIG_NAME string = "config.json"
@@ -32,6 +37,8 @@ var (
 )
 
 func init() {
+	flag.Parse()
+
 	logfile, err := os.Create("logs.txt")
 	if err != nil {
 		log.Fatal("Failed to create logs file: " + err.Error())
@@ -54,6 +61,13 @@ func main() {
 	bot, err := bot.NewBot(CONFIG)
 	if err != nil {
 		log.Panic(err)
+	}
+
+	if *migrate {
+		err = bot.MigrateDB()
+		if err != nil {
+			log.Panic(err)
+		}
 	}
 
 	if err := bot.Start(); err != nil {

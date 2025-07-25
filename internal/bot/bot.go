@@ -23,6 +23,7 @@ import (
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social/ok"
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social/tg"
 	"Unbewohnte/SNGCNOTIFIERbot/internal/bot/social/vk"
+	"Unbewohnte/SNGCNOTIFIERbot/internal/db"
 	"context"
 	"log"
 	"strings"
@@ -31,11 +32,18 @@ import (
 	"github.com/mymmrac/telego"
 )
 
+type PendingComment struct {
+	Group      db.MonitoredGroup
+	Comment    db.Comment
+	ReceivedAt time.Time
+}
+
 type Bot struct {
 	api      *telego.Bot
 	conf     *Config
 	commands []Command
 	social   *social.SocialManager
+	db       *db.DB
 }
 
 func NewBot(config *Config) (*Bot, error) {
@@ -56,19 +64,24 @@ func NewBot(config *Config) (*Bot, error) {
 		TGClient: tg.NewClient(api),
 	}
 
+	dbase, err := config.OpenDB()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Bot{
 		api:    api,
 		conf:   config,
 		social: socialManager,
+		db:     dbase,
 	}, nil
 }
 
-func (bot *Bot) Init() {
-	_, err := bot.conf.OpenDB()
-	if err != nil {
-		log.Panic(err)
-	}
+func (bot *Bot) MigrateDB() error {
+	return bot.db.Migrate()
+}
 
+func (bot *Bot) Init() {
 	bot.NewCommand(Command{
 		Name:        "help",
 		Description: "Напечатать вспомогательное сообщение",
@@ -163,6 +176,21 @@ func (bot *Bot) Init() {
 		Group:       "Общее",
 		Call:        bot.ToggleAllowEmptyComments,
 	})
+
+	bot.NewCommand(Command{
+		Name:        "schedule",
+		Description: "Показать текущее расписание уведомлений",
+		Group:       "Расписание",
+		Call:        bot.ShowSchedule,
+	})
+
+	bot.NewCommand(Command{
+		Name:        "setschedule",
+		Description: "Установить расписание уведомлений",
+		Example:     "setschedule enabled mon,tue,wed,thu,fri 08:00 18:00 Europe/Moscow",
+		Group:       "Расписание",
+		Call:        bot.SetSchedule,
+	})
 }
 
 func (bot *Bot) Start() error {
@@ -170,7 +198,13 @@ func (bot *Bot) Start() error {
 
 	log.Printf("Бот авторизован как %s", bot.api.Username())
 
-	bot.StartMonitoring()
+	// Выполняем миграцию БД
+	if err := bot.db.Migrate(); err != nil {
+		log.Printf("Ошибка миграции БД: %v", err)
+	}
+
+	bot.StartMonitoring(bot.conf.CheckIntervalMinutes)
+
 	startTime := time.Now()
 	retryDelay := 5 * time.Second
 
@@ -210,6 +244,11 @@ func (bot *Bot) Start() error {
 					bot.handleTelegramComment(message)
 				}
 
+				// Команда ли это
+				if !strings.HasPrefix(message.Text, "/") {
+					return // Пропускаем
+				}
+
 				// Проверка доступа
 				if !bot.conf.Telegram.Public {
 					var allowed bool = false
@@ -234,7 +273,7 @@ func (bot *Bot) Start() error {
 				// Обработка команд
 				message.Text = strings.TrimSpace(message.Text)
 				for _, command := range bot.commands {
-					if strings.HasPrefix(strings.ToLower(message.Text), "/"+command.Name) {
+					if strings.HasPrefix(strings.ToLower(message.Text), command.Name) {
 						go command.Call(message)
 						return
 					}

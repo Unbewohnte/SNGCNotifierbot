@@ -195,7 +195,7 @@ func (c *Client) getPostComments(ctx context.Context, postID, groupID string, la
 		}
 
 		comments = append(comments, db.Comment{
-			ID:        comment.ID,
+			ID:        fmt.Sprintf("ok-%s", comment.ID),
 			Author:    authorName,
 			Text:      comment.Text,
 			Timestamp: commentTimeUTC.Unix(),

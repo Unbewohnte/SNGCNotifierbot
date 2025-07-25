@@ -30,9 +30,9 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-func (bot *Bot) StartMonitoring() {
-	go func() {
-		ticker := time.NewTicker(10 * time.Minute) // Проверяем каждые N минут
+func (bot *Bot) StartMonitoring(intervalMins int) {
+	go func(intervalMins int) {
+		ticker := time.NewTicker(time.Duration(intervalMins) * time.Minute)
 		defer ticker.Stop()
 
 		for range ticker.C {
@@ -43,10 +43,6 @@ func (bot *Bot) StartMonitoring() {
 			}
 
 			for _, group := range groups {
-				if bot.conf.Debug {
-					log.Printf("Смотрим группу %+v...", group)
-				}
-
 				comments, err := bot.checkGroupComments(group)
 				if err != nil {
 					log.Printf("Ошибка проверки группы %s (%s): %v",
@@ -54,20 +50,23 @@ func (bot *Bot) StartMonitoring() {
 					continue
 				}
 
-				if bot.conf.Debug {
-					log.Printf("Комментарии: %+v", comments)
-				}
-
 				if len(comments) > 0 {
-					bot.notifyNewComments(group, comments)
-					bot.conf.GetDB().UpdateLastCheck(group.ID, time.Now().Unix())
+					if bot.isNotificationAllowed() {
+						bot.notifyNewComments(group, comments)
+					} else {
+						bot.cacheComments(group, comments)
+					}
 				}
 
-				// Даем время
+				// Всегда обновляем время последней проверки
+				bot.conf.GetDB().UpdateLastCheck(group.ID, time.Now().Unix())
 				time.Sleep(time.Second * 3)
 			}
+
+			// Проверяем кэш при каждой итерации
+			bot.processPendingComments()
 		}
-	}()
+	}(intervalMins)
 }
 
 func (bot *Bot) checkGroupComments(group db.MonitoredGroup) ([]db.Comment, error) {
@@ -108,18 +107,26 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 	for _, comment := range comments {
 		processedText := processCommentText(comment.Text)
 
+		status := "Только что"
+		if comment.IsPending {
+			status = fmt.Sprintf("Отправлено с задержкой: %s (комментарий получен в нерабочее время)",
+				time.Unix(comment.Timestamp, 0).Format("2006-01-02 15:04"))
+		}
+
 		msgText := fmt.Sprintf(
 			"💬 *Новый комментарий в %s (%s)*:\n\n"+
 				"👤 *Автор*: %s\n"+
 				"📝 *Текст*: %s\n"+
 				"🔗 *Ссылка*: [Перейти к посту](%s)\n"+
-				"⏰ *Время*: %s",
+				"⏰ *Время*: %s"+
+				"📌 *Статус оповещения*: %s",
 			group.GroupName,
 			group.Network,
 			comment.Author,
 			processedText,
 			comment.PostURL,
 			time.Unix(comment.Timestamp, 0).Format("2006-01-02 15:04"),
+			status,
 		)
 
 		params := &telego.SendMessageParams{
@@ -137,4 +144,113 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 			log.Printf("Ошибка отправки уведомления: %v", err)
 		}
 	}
+}
+
+func (bot *Bot) handleTelegramComment(msg *telego.Message) {
+	// Пропускаем служебные сообщения и сообщения от самого бота
+	if msg.From != nil && msg.From.ID == bot.api.ID() {
+		return
+	}
+
+	// Формируем комментарий
+	comment := db.Comment{
+		ID:         fmt.Sprintf("%d", msg.MessageID),
+		CommentID:  fmt.Sprintf("tg-%d", msg.MessageID),
+		Author:     formatUserName(msg.From),
+		Text:       msg.Text,
+		Timestamp:  int64(msg.Date),
+		PostURL:    generateTelegramLink(msg),
+		IsPending:  false,
+		ReceivedAt: time.Now().Unix(),
+	}
+
+	group, err := bot.db.GetGroupByNetworkAndID("tg", fmt.Sprintf("%d", msg.Chat.ID))
+	if err != nil {
+		log.Printf("Failed to get tg group by ID: %s", err)
+		return
+	}
+
+	// Обрабатываем комментарий
+	if bot.isNotificationAllowed() {
+		bot.notifyNewComments(*group, []db.Comment{comment})
+	} else {
+		comment.IsPending = true
+		bot.cacheComments(*group, []db.Comment{comment})
+	}
+}
+
+func (bot *Bot) cacheComments(group db.MonitoredGroup, comments []db.Comment) error {
+	for i := range comments {
+		_, err := bot.db.Exec(`
+            INSERT OR REPLACE INTO comments 
+            (id, group_id, network, comment_id, author, text, timestamp, post_url, is_pending, received_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			comments[i].ID,
+			group.ID,
+			group.Network,
+			comments[i].CommentID,
+			comments[i].Author,
+			comments[i].Text,
+			comments[i].Timestamp,
+			comments[i].PostURL,
+			true,              // is_pending = true
+			time.Now().Unix(), // received_at
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (bot *Bot) processPendingComments() error {
+	if !bot.isNotificationAllowed() {
+		return nil
+	}
+
+	// Получаем все отложенные комментарии
+	rows, err := bot.db.Query(`
+        SELECT * FROM comments 
+        WHERE is_pending = TRUE 
+        AND received_at > ?`,
+		time.Now().Add(-7*24*time.Hour).Unix(),
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var comments []db.Comment
+	for rows.Next() {
+		var c db.Comment
+		err := rows.Scan(
+			&c.ID, &c.GroupID, &c.Network, &c.CommentID,
+			&c.Author, &c.Text, &c.Timestamp, &c.PostURL,
+			&c.IsPending, &c.ReceivedAt,
+		)
+		if err != nil {
+			return err
+		}
+		comments = append(comments, c)
+	}
+
+	// Отправляем и помечаем как отправленные
+	for _, c := range comments {
+		group, err := bot.db.GetGroupByNetworkAndID(c.Network, fmt.Sprintf("%d", c.GroupID))
+		if err != nil {
+			continue
+		}
+
+		bot.notifyNewComments(*group, []db.Comment{c})
+
+		// Обновляем статус в БД
+		_, err = bot.db.Exec(`
+            UPDATE comments SET is_pending = FALSE 
+            WHERE id = ?`, c.ID)
+		if err != nil {
+			log.Printf("Ошибка обновления комментария: %v", err)
+		}
+	}
+
+	return nil
 }

@@ -26,7 +26,7 @@ import (
 func (db *DB) AddGroup(group *MonitoredGroup) (int64, error) {
 	result, err := db.Exec(`
 		INSERT INTO monitored_groups (network, group_id, group_name, last_check)
-		VALUES (?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?)
 	`, group.Network, group.GroupID, group.GroupName, group.LastCheck)
 	if err != nil {
 		return 0, err
@@ -158,4 +158,13 @@ func (db *DB) GetGroupByNetworkAndID(network, groupID string) (*MonitoredGroup, 
 	}
 
 	return &group, nil
+}
+
+func (db *DB) UpdateLastNotified(groupID int64, timestamp int64) error {
+	_, err := db.Exec(`
+        UPDATE monitored_groups
+        SET last_notified = ?
+        WHERE id = ?
+    `, timestamp, groupID)
+	return err
 }

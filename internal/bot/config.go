@@ -62,12 +62,22 @@ type SocialConfig struct {
 	TG TGConf `json:"telegram"`
 }
 
+type ScheduleConfig struct {
+	Enabled    bool     `json:"enabled"`
+	DaysOfWeek []string `json:"days_of_week"` // ["mon", "tue", "wed", "thu", "fri"]
+	StartTime  string   `json:"start_time"`   // "08:00"
+	EndTime    string   `json:"end_time"`     // "18:00"
+	Timezone   string   `json:"timezone"`     // "Europe/Moscow"
+}
+
 type Config struct {
-	Telegram           TelegramConf `json:"telegram"`
-	Debug              bool         `json:"debug"`
-	DB                 DBConf       `json:"database"`
-	Social             SocialConfig `json:"socials"`
-	AllowEmptyComments bool         `json:"allow_empty_comments"`
+	Telegram             TelegramConf   `json:"telegram"`
+	Debug                bool           `json:"debug"`
+	DB                   DBConf         `json:"database"`
+	Social               SocialConfig   `json:"socials"`
+	AllowEmptyComments   bool           `json:"allow_empty_comments"`
+	Schedule             ScheduleConfig `json:"schedule"`
+	CheckIntervalMinutes int            `json:"check_interval_minutes"`
 }
 
 func (c *Config) OpenDB() (*db.DB, error) {
@@ -109,6 +119,14 @@ func DefaultConfig() *Config {
 		},
 		Debug:              false,
 		AllowEmptyComments: true,
+		Schedule: ScheduleConfig{
+			Enabled:    false,
+			DaysOfWeek: []string{"mon", "tue", "wed", "thu", "fri"},
+			StartTime:  "08:00",
+			EndTime:    "20:00",
+			Timezone:   "Europe/Moscow",
+		},
+		CheckIntervalMinutes: 10,
 	}
 }
 

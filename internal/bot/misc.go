@@ -21,8 +21,10 @@ package bot
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mymmrac/telego"
@@ -168,50 +170,64 @@ func (bot *Bot) isMonitoredTelegramGroup(chatID int64) bool {
 	return false
 }
 
-func (bot *Bot) handleTelegramComment(msg *telego.Message) {
-	// Пропускаем служебные сообщения и сообщения от самого бота
-	if msg.From != nil && msg.From.ID == bot.api.ID() {
-		return
+// Проверяет, разрешено ли сейчас отправлять уведомления
+func (bot *Bot) isNotificationAllowed() bool {
+	schedule := bot.conf.Schedule
+
+	// Если расписание отключено - разрешаем всегда
+	if !schedule.Enabled {
+		return true
 	}
 
-	// Формируем информацию о комментарии
-	authorName := msg.From.FirstName
-	if msg.From.LastName != "" {
-		authorName += " " + msg.From.LastName
+	// Определяем текущее время в нужном часовом поясе
+	loc, err := time.LoadLocation(schedule.Timezone)
+	if err != nil {
+		log.Printf("Ошибка загрузки часового пояса: %v", err)
+		return true // Разрешаем по умолчанию
 	}
 
-	// Формируем ссылку на сообщение
-	var link string
+	now := time.Now().In(loc)
+	currentDay := strings.ToLower(now.Weekday().String()[:3])
+	currentTime := now.Format("15:04")
+
+	// Проверяем день недели
+	dayAllowed := false
+	for _, day := range schedule.DaysOfWeek {
+		if strings.ToLower(day) == currentDay {
+			dayAllowed = true
+			break
+		}
+	}
+
+	if !dayAllowed {
+		return false
+	}
+
+	// Проверяем временной интервал
+	return currentTime >= schedule.StartTime && currentTime <= schedule.EndTime
+}
+
+// Форматирует имя пользователя Telegram
+func formatUserName(user *telego.User) string {
+	if user == nil {
+		return "Неизвестный пользователь"
+	}
+	name := user.FirstName
+	if user.LastName != "" {
+		name += " " + user.LastName
+	}
+	if user.Username != "" {
+		name += " (@" + user.Username + ")"
+	}
+	return name
+}
+
+// Генерирует ссылку на сообщение в Telegram
+func generateTelegramLink(msg *telego.Message) string {
 	if msg.Chat.Username != "" {
-		link = fmt.Sprintf("https://t.me/%s/%d", msg.Chat.Username, msg.MessageID)
-	} else {
-		link = fmt.Sprintf("chat_id: %d, message_id: %d", msg.Chat.ID, msg.MessageID)
+		return fmt.Sprintf("https://t.me/%s/%d", msg.Chat.Username, msg.MessageID)
 	}
 
-	// Создаем уведомление
-	msgText := fmt.Sprintf(
-		"💬 *Новый комментарий в %s (Telegram)*:\n"+
-			"👤 *Автор*: %s\n"+
-			"📝 *Текст*: %s\n"+
-			"🔗 *Ссылка*: [Перейти к комментарию](%s)\n"+
-			"⏰ *Время*: %s",
-		msg.Chat.Title,
-		authorName,
-		msg.Text,
-		link,
-		time.Unix(int64(msg.Date), 0).Format("2006-01-02 15:04"),
-	)
-
-	// Отправляем уведомление в мониторинговый канал
-	params := &telego.SendMessageParams{
-		ChatID:    telego.ChatID{ID: bot.conf.Telegram.MonitoringChannelID},
-		Text:      msgText,
-		ParseMode: "Markdown",
-	}
-
-	if bot.conf.Telegram.MonitoringThreadID != 0 {
-		params.MessageThreadID = int(bot.conf.Telegram.MonitoringThreadID)
-	}
-
-	bot.api.SendMessage(context.Background(), params)
+	// Для чатов без username используем формат с ID
+	return fmt.Sprintf("https://t.me/c/%d/%d", msg.Chat.ID, msg.MessageID)
 }

@@ -160,7 +160,7 @@ func (c *Client) getNewPostComments(ctx context.Context, groupID string, postID 
 		}
 
 		comments = append(comments, db.Comment{
-			ID:        strconv.Itoa(comment.ID),
+			ID:        fmt.Sprintf("vk-%d", comment.ID),
 			Author:    authorName,
 			Text:      comment.Text,
 			Timestamp: comment.Date,

@@ -20,6 +20,7 @@ package db
 
 import (
 	"database/sql"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -47,26 +48,51 @@ func NewDB(path string) (*DB, error) {
 		group_id TEXT NOT NULL,
 		group_name TEXT NOT NULL,
 		last_check INTEGER DEFAULT 0,
+		last_notified INTEGER DEFAULT 0,
 		extra_data TEXT DEFAULT '{}'
 	);
 	
-	CREATE TABLE IF NOT EXISTS comments (
-		id TEXT PRIMARY KEY,
-		group_id INTEGER NOT NULL,
-		network TEXT NOT NULL,
-		comment_id TEXT NOT NULL,
-		author TEXT NOT NULL,
-		text TEXT NOT NULL,
-		timestamp INTEGER NOT NULL,
-		post_url TEXT NOT NULL,
-		FOREIGN KEY(group_id) REFERENCES monitored_groups(id) ON DELETE CASCADE
-	);
-	
-	CREATE INDEX IF NOT EXISTS idx_comments_group ON comments(group_id);
+    CREATE TABLE IF NOT EXISTS comments (
+        id TEXT PRIMARY KEY,
+        group_id INTEGER NOT NULL,
+        network TEXT NOT NULL,
+        comment_id TEXT NOT NULL,
+        author TEXT NOT NULL,
+        text TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        post_url TEXT NOT NULL,
+        is_pending BOOLEAN DEFAULT FALSE,
+        received_at INTEGER DEFAULT 0,
+        FOREIGN KEY(group_id) REFERENCES monitored_groups(id) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_comments_group ON comments(group_id);
+    CREATE INDEX IF NOT EXISTS idx_comments_pending ON comments(is_pending);
 `)
 	if err != nil {
 		return nil, err
 	}
 
 	return &DB{db}, nil
+}
+
+func (db *DB) Migrate() error {
+	// Добавляем новые столбцы, если их нет
+	_, err := db.Exec(`
+        ALTER TABLE comments
+        ADD COLUMN is_pending BOOLEAN DEFAULT FALSE
+    `)
+	if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		return err
+	}
+
+	_, err = db.Exec(`
+        ALTER TABLE comments
+        ADD COLUMN received_at INTEGER DEFAULT 0
+    `)
+	if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		return err
+	}
+
+	return nil
 }
