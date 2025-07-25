@@ -187,6 +187,13 @@ func (bot *Bot) Init() {
 		Group:       "Расписание",
 		Call:        bot.SetSchedule,
 	})
+
+	bot.NewCommand(Command{
+		Name:        "toggleschedule",
+		Description: "Включить/Выключить оповещения по расписанию",
+		Group:       "Расписание",
+		Call:        bot.ToggleEnableSchedule,
+	})
 }
 
 func (bot *Bot) Start() error {

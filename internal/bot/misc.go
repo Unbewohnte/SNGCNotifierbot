@@ -91,13 +91,14 @@ func (bot *Bot) findSimilarCommands(input string) []string {
 	return suggestions
 }
 
-func (bot *Bot) sendMessage(chatID int64, text string) {
+func (bot *Bot) sendMessage(chatID int64, threadID int, text string) {
 	params := &telego.SendMessageParams{
 		ChatID: telego.ChatID{
 			ID: chatID,
 		},
-		Text:      text,
-		ParseMode: "Markdown",
+		MessageThreadID: threadID,
+		Text:            text,
+		ParseMode:       "Markdown",
 	}
 
 	bot.api.SendMessage(context.Background(), params)
@@ -108,12 +109,9 @@ func (bot *Bot) answerBack(message *telego.Message, text string, reply bool) {
 		ChatID: telego.ChatID{
 			ID: message.Chat.ID,
 		},
-		Text:      text,
-		ParseMode: "Markdown",
-	}
-
-	if message.MessageThreadID != 0 {
-		params.MessageThreadID = message.MessageThreadID
+		MessageThreadID: message.MessageThreadID,
+		Text:            text,
+		ParseMode:       "Markdown",
 	}
 
 	if reply {

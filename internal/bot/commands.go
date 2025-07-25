@@ -71,7 +71,7 @@ func (bot *Bot) Help(message *telego.Message) {
 		command := bot.CommandByName(parts[1])
 		if command != nil {
 			helpMessage := constructCommandHelpMessage(*command)
-			bot.sendMessage(message.Chat.ID, helpMessage)
+			bot.sendMessage(message.Chat.ID, message.MessageThreadID, helpMessage)
 			return
 		}
 	}
@@ -96,7 +96,7 @@ func (bot *Bot) Help(message *telego.Message) {
 		}
 	}
 
-	bot.sendMessage(message.Chat.ID, helpMessage)
+	bot.sendMessage(message.Chat.ID, message.MessageThreadID, helpMessage)
 }
 
 func (bot *Bot) About(message *telego.Message) {
@@ -548,7 +548,7 @@ func (bot *Bot) ShowSchedule(message *telego.Message) {
 	}
 	response += "```"
 
-	bot.sendMessage(message.Chat.ID, response)
+	bot.sendMessage(message.Chat.ID, message.MessageThreadID, response)
 }
 
 func (bot *Bot) SetSchedule(message *telego.Message) {
@@ -654,4 +654,17 @@ func isValidTime(t string) bool {
 	}
 
 	return true
+}
+
+func (bot *Bot) ToggleEnableSchedule(message *telego.Message) {
+	if bot.conf.Schedule.Enabled {
+		bot.conf.Schedule.Enabled = false
+		bot.answerBack(message, "Оповещения по расписанию выключены.", true)
+	} else {
+		bot.conf.Schedule.Enabled = true
+		bot.answerBack(message, "Оповещения по расписанию включены.", true)
+	}
+
+	// Обновляем конфигурационный файл
+	bot.conf.Update()
 }
