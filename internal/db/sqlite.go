@@ -20,7 +20,6 @@ package db
 
 import (
 	"database/sql"
-	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -74,25 +73,4 @@ func NewDB(path string) (*DB, error) {
 	}
 
 	return &DB{db}, nil
-}
-
-func (db *DB) Migrate() error {
-	// Добавляем новые столбцы, если их нет
-	_, err := db.Exec(`
-        ALTER TABLE comments
-        ADD COLUMN is_pending BOOLEAN DEFAULT FALSE
-    `)
-	if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
-		return err
-	}
-
-	_, err = db.Exec(`
-        ALTER TABLE comments
-        ADD COLUMN received_at INTEGER DEFAULT 0
-    `)
-	if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
-		return err
-	}
-
-	return nil
 }

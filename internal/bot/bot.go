@@ -77,10 +77,6 @@ func NewBot(config *Config) (*Bot, error) {
 	}, nil
 }
 
-func (bot *Bot) MigrateDB() error {
-	return bot.db.Migrate()
-}
-
 func (bot *Bot) Init() {
 	bot.NewCommand(Command{
 		Name:        "help",
@@ -197,11 +193,6 @@ func (bot *Bot) Start() error {
 	bot.Init()
 
 	log.Printf("Бот авторизован как %s", bot.api.Username())
-
-	// Выполняем миграцию БД
-	if err := bot.db.Migrate(); err != nil {
-		log.Printf("Ошибка миграции БД: %v", err)
-	}
 
 	bot.StartMonitoring(bot.conf.CheckIntervalMinutes)
 
