@@ -201,6 +201,13 @@ func (bot *Bot) Init() {
 		Group:       "Общее",
 		Call:        bot.Silence,
 	})
+
+	bot.NewCommand(Command{
+		Name:        "getlogs",
+		Description: "Получить файл логов",
+		Group:       "Общее",
+		Call:        bot.SendLogs,
+	})
 }
 
 func (bot *Bot) Start() error {

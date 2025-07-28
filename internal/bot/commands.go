@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -677,4 +678,59 @@ func (bot *Bot) Silence(message *telego.Message) {
 	bot.conf.Telegram.MonitoringChannelID = 0
 	bot.conf.Telegram.MonitoringThreadID = 0
 	bot.conf.Update()
+}
+
+func (bot *Bot) SendLogs(message *telego.Message) {
+	// Check if log file exists
+	if _, err := os.Stat(bot.conf.LogsFile); os.IsNotExist(err) {
+		bot.sendError(message, "Файл логов не найден")
+		return
+	}
+
+	// Read log file
+	logFile, err := os.Open(bot.conf.LogsFile)
+	if err != nil {
+		bot.sendError(message, "Ошибка чтения файла логов")
+		log.Printf("Ошибка открытия файла логов: %v", err)
+		return
+	}
+	defer logFile.Close()
+
+	fileInfo, err := logFile.Stat()
+	if err != nil {
+		bot.sendError(message, "Ошибка получения информации о файле")
+		log.Printf("Ошибка получения информации о файле логов: %v", err)
+		return
+	}
+
+	if fileInfo.Size() > 50*1024*1024 {
+		bot.sendError(message, "Файл логов слишком большой (максимум 50MB)")
+		return
+	}
+
+	inputFile := telego.InputFile{
+		File: logFile,
+	}
+
+	// Параметры отправки документа
+	params := telego.SendDocumentParams{
+		ChatID: telego.ChatID{
+			ID: message.Chat.ID,
+		},
+		Document: inputFile,
+		Caption:  "📋 Логи бота",
+		ReplyParameters: &telego.ReplyParameters{
+			MessageID: message.MessageID,
+		},
+	}
+
+	if message.MessageThreadID != 0 {
+		params.MessageThreadID = message.MessageThreadID
+	}
+
+	// Отправка документа
+	if _, err := bot.api.SendDocument(context.Background(), &params); err != nil {
+		bot.sendError(message, "Ошибка отправки файла")
+		log.Printf("Ошибка отправки файла логов: %v", err)
+	}
 }

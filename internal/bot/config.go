@@ -78,6 +78,7 @@ type Config struct {
 	AllowEmptyComments   bool           `json:"allow_empty_comments"`
 	Schedule             ScheduleConfig `json:"schedule"`
 	CheckIntervalMinutes int            `json:"check_interval_minutes"`
+	LogsFile             string         `json:"logs_file"`
 }
 
 func (c *Config) OpenDB() (*db.DB, error) {
@@ -127,6 +128,7 @@ func DefaultConfig() *Config {
 			Timezone:   "Europe/Moscow",
 		},
 		CheckIntervalMinutes: 10,
+		LogsFile:             "logs.txt",
 	}
 }
 
