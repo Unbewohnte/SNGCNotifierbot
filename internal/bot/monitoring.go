@@ -46,6 +46,8 @@ func (bot *Bot) StartMonitoring(intervalMins int) {
 			log.Printf("Проверка %d групп...", len(groups))
 
 			for _, group := range groups {
+				time.Sleep(time.Second * 3)
+
 				comments, err := bot.checkGroupComments(group)
 				if err != nil {
 					log.Printf("Ошибка проверки группы %s (%s): %v",
@@ -54,16 +56,27 @@ func (bot *Bot) StartMonitoring(intervalMins int) {
 				}
 
 				if len(comments) > 0 {
+					log.Printf("Найдено %d новых комментариев в %s (%s)",
+						len(comments),
+						group.GroupName,
+						group.Network,
+					)
+
 					if bot.isNotificationAllowed() {
+						log.Printf("Оповещения разрешены, оповещение...")
 						bot.notifyNewComments(group, comments)
 					} else {
-						bot.cacheComments(group, comments)
+						log.Printf("Оповещения запрещены, добавление в кэш...")
+						err = bot.cacheComments(group, comments)
+						if err != nil {
+							log.Printf("Ошибка добавления новых комментариев в кэш: %s. Не обновляем время последней проверки.", err)
+							continue
+						}
 					}
 				}
 
-				// Всегда обновляем время последней проверки
+				// Обновляем время последней проверки
 				bot.conf.GetDB().UpdateLastCheck(group.ID, time.Now().Unix())
-				time.Sleep(time.Second * 3)
 			}
 
 			// Проверяем кэш при каждой итерации
@@ -121,7 +134,7 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 				"👤 *Автор*: %s\n"+
 				"📝 *Текст*: %s\n"+
 				"🔗 *Ссылка*: [Перейти к посту](%s)\n"+
-				"⏰ *Время*: %s"+
+				"⏰ *Время*: %s\n"+
 				"📌 *Статус оповещения*: %s",
 			group.GroupName,
 			group.Network,
@@ -151,7 +164,11 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 
 func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 	// Пропускаем служебные сообщения и сообщения от самого бота
-	if msg.From != nil && msg.From.ID == bot.api.ID() {
+	if msg.From == nil {
+		return
+	}
+
+	if msg.From.ID == bot.api.ID() {
 		return
 	}
 
@@ -173,12 +190,23 @@ func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 		return
 	}
 
+	log.Printf("Новый комментарий в телеграм от %d в %s (%s).",
+		msg.From.ID,
+		group.GroupName,
+		group.Network,
+	)
+
 	// Обрабатываем комментарий
 	if bot.isNotificationAllowed() {
+		log.Printf("Оповещение о телеграм комментарии...")
 		bot.notifyNewComments(*group, []db.Comment{comment})
 	} else {
+		log.Printf("Добавление телеграм комментария в кэш...")
 		comment.IsPending = true
-		bot.cacheComments(*group, []db.Comment{comment})
+		err = bot.cacheComments(*group, []db.Comment{comment})
+		if err != nil {
+			log.Printf("Не удалось сохранить телеграм комментарий в кэш: %s. Потеря комментария.", err)
+		}
 	}
 }
 
