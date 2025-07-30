@@ -162,14 +162,10 @@ func (bot *Bot) isMonitoredTelegramGroup(chatID int64) bool {
 		return false
 	}
 
-	log.Printf("Проверяем chatID %d в мониторируемых группах: %+v", chatID, groups)
-
 	// Преобразуем chatID в строку
 	chatIDStr := strconv.FormatInt(chatID, 10)
 
 	for _, group := range groups {
-		log.Printf("Сравниваем: GroupID='%s' с chatID='%d'", group.GroupID, chatID)
-
 		if group.GroupID == chatIDStr {
 			return true
 		}
@@ -232,10 +228,18 @@ func formatUserName(user *telego.User) string {
 
 // Генерирует ссылку на сообщение в Telegram
 func generateTelegramLink(msg *telego.Message) string {
+	// Базовый URL (пост или сообщение)
+	baseURL := ""
 	if msg.Chat.Username != "" {
-		return fmt.Sprintf("https://t.me/%s/%d", msg.Chat.Username, msg.MessageID)
+		baseURL = fmt.Sprintf("https://t.me/%s/%d", msg.Chat.Username, msg.MessageID)
+	} else {
+		baseURL = fmt.Sprintf("https://t.me/c/%d/%d", msg.Chat.ID, msg.MessageID)
 	}
 
-	// Для чатов без username используем формат с ID
-	return fmt.Sprintf("https://t.me/c/%d/%d", msg.Chat.ID, msg.MessageID)
+	// Если это комментарий (есть ReplyToMessage), добавляем параметр ?comment=
+	if msg.ReplyToMessage != nil {
+		return fmt.Sprintf("%s?comment=%d", baseURL, msg.MessageID)
+	}
+
+	return baseURL
 }

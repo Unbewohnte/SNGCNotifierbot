@@ -252,8 +252,6 @@ func (bot *Bot) Start() error {
 				continue
 			}
 
-			log.Printf("Получено сообщение: ChatID=%d, Text=%s", update.Message.Chat.ID, update.Message.Text)
-
 			go func(message *telego.Message) {
 				// Обработка комментариев в Telegram группах
 				if bot.isMonitoredTelegramGroup(message.Chat.ID) {

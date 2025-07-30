@@ -47,6 +47,10 @@ func (bot *Bot) StartMonitoring(intervalMins int) {
 			log.Printf("Проверка %d групп...", len(groups))
 
 			for _, group := range groups {
+				if group.Network == "tg" {
+					continue
+				}
+
 				time.Sleep(time.Second * 3)
 
 				comments, err := bot.checkGroupComments(group)
@@ -164,8 +168,6 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 }
 
 func (bot *Bot) handleTelegramComment(msg *telego.Message) {
-	log.Printf("Обработка комментария: ChatID=%d, Text=%s", msg.Chat.ID, msg.Text)
-
 	// Пропускаем служебные сообщения и сообщения от самого бота
 	if msg.From == nil {
 		return
