@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -184,7 +185,7 @@ func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 		ReceivedAt: time.Now().Unix(),
 	}
 
-	group, err := bot.db.GetGroupByNetworkAndID("tg", fmt.Sprintf("%d", msg.Chat.ID))
+	group, err := bot.db.GetGroupByNetworkAndID("tg", strconv.FormatInt(msg.Chat.ID, 10))
 	if err != nil {
 		log.Printf("Failed to get tg group by ID: %s", err)
 		return

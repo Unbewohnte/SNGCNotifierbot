@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -161,11 +162,15 @@ func (bot *Bot) isMonitoredTelegramGroup(chatID int64) bool {
 		return false
 	}
 
+	// Преобразуем chatID в строку
+	chatIDStr := strconv.FormatInt(chatID, 10)
+
 	for _, group := range groups {
-		if group.GroupID == fmt.Sprintf("tg-%d", chatID) {
+		if group.GroupID == chatIDStr {
 			return true
 		}
 	}
+
 	return false
 }
 
