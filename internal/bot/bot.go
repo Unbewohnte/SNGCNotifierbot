@@ -252,16 +252,11 @@ func (bot *Bot) Start() error {
 				continue
 			}
 
-			if bot.conf.Debug {
-				log.Printf("Сообщение в TG: %s - chatID %v", update.Message.Text, update.Message.Chat.ID)
-			}
+			log.Printf("Получено сообщение: ChatID=%d, Text=%s", update.Message.Chat.ID, update.Message.Text)
 
 			go func(message *telego.Message) {
 				// Обработка комментариев в Telegram группах
 				if bot.isMonitoredTelegramGroup(message.Chat.ID) {
-					if bot.conf.Debug {
-						log.Printf("Сообщение в группе, которую бот мониторит")
-					}
 					bot.handleTelegramComment(message)
 					return
 				}

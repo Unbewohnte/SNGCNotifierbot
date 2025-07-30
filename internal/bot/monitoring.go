@@ -164,6 +164,8 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 }
 
 func (bot *Bot) handleTelegramComment(msg *telego.Message) {
+	log.Printf("Обработка комментария: ChatID=%d, Text=%s", msg.Chat.ID, msg.Text)
+
 	// Пропускаем служебные сообщения и сообщения от самого бота
 	if msg.From == nil {
 		return

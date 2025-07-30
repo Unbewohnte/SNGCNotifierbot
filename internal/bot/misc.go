@@ -162,10 +162,14 @@ func (bot *Bot) isMonitoredTelegramGroup(chatID int64) bool {
 		return false
 	}
 
+	log.Printf("Проверяем chatID %d в мониторируемых группах: %+v", chatID, groups)
+
 	// Преобразуем chatID в строку
 	chatIDStr := strconv.FormatInt(chatID, 10)
 
 	for _, group := range groups {
+		log.Printf("Сравниваем: GroupID='%s' с chatID='%d'", group.GroupID, chatID)
+
 		if group.GroupID == chatIDStr {
 			return true
 		}
