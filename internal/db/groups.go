@@ -26,7 +26,7 @@ import (
 func (db *DB) AddGroup(group *MonitoredGroup) (int64, error) {
 	result, err := db.Exec(`
 		INSERT INTO monitored_groups (network, group_id, group_name, last_check)
-		VALUES (?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?)
 	`, group.Network, group.GroupID, group.GroupName, group.LastCheck)
 	if err != nil {
 		return 0, err

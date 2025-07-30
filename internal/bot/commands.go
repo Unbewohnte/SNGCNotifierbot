@@ -356,6 +356,7 @@ func (bot *Bot) AddGroup(message *telego.Message) {
 
 	id, err := bot.conf.GetDB().AddGroup(&group)
 	if err != nil {
+		log.Printf("Ошибка добавления группы %s (%s): %s", group.GroupName, group.GroupID, err)
 		bot.sendError(message, "Ошибка добавления группы: "+err.Error())
 		return
 	}
