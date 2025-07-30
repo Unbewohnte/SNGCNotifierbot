@@ -177,6 +177,11 @@ func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 		return
 	}
 
+	// Пропускаем сообщения от "группы" (пользователя Telegram)
+	if msg.From.ID == 777000 { // 777000 — официальный ID Telegram-групп
+		return
+	}
+
 	// Формируем комментарий
 	comment := db.Comment{
 		ID:         fmt.Sprintf("tg-%d", msg.MessageID),
