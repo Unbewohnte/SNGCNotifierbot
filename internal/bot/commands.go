@@ -186,7 +186,7 @@ func (bot *Bot) PrintConfig(message *telego.Message) {
 	response += fmt.Sprintf("*Общедоступный?*: `%v`\n", bot.conf.Telegram.Public)
 	response += fmt.Sprintf("*Разрешенные пользователи*: `%+v`\n", bot.conf.Telegram.AllowedUserIDs)
 	response += fmt.Sprintf("*Мониторинговый чат*: `%+v`\n", bot.conf.Telegram.MonitoringChannelID)
-	response += fmt.Sprintf("*Раздел:*: `%+v`\n", bot.conf.Telegram.MonitoringThreadID)
+	response += fmt.Sprintf("*Раздел*: `%+v`\n", bot.conf.Telegram.MonitoringThreadID)
 	response += fmt.Sprintf("*Пустые комментарии разрешены?*: `%+v`\n", bot.conf.AllowEmptyComments)
 
 	response += "\n*[СОЦИАЛЬНЫЕ СЕТИ]*:\n"

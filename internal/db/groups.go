@@ -160,6 +160,39 @@ func (db *DB) GetGroupByNetworkAndID(network, groupID string) (*MonitoredGroup, 
 	return &group, nil
 }
 
+func (db *DB) GetGroupByInternalID(id string) (*MonitoredGroup, error) {
+	var group MonitoredGroup
+	var createdAt string
+
+	err := db.QueryRow(`
+        SELECT id, created_at, network, group_id, group_name, last_check, extra_data
+        FROM monitored_groups
+        WHERE id = ?
+    `, id).Scan(
+		&group.ID,
+		&createdAt,
+		&group.Network,
+		&group.GroupID,
+		&group.GroupName,
+		&group.LastCheck,
+		&group.ExtraData,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	group.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &group, nil
+}
+
 func (db *DB) UpdateLastNotified(groupID int64, timestamp int64) error {
 	_, err := db.Exec(`
         UPDATE monitored_groups

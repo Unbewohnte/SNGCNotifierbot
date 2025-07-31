@@ -226,35 +226,32 @@ func formatUserName(user *telego.User) string {
 	return name
 }
 
-func isLikelyCommentGroup(chat *telego.Chat) bool {
-	return chat.Username == "" &&
-		(chat.Type == "supergroup" || chat.Type == "group") &&
-		chat.ID < 0 // приватный чат
-}
-
 // Генерирует ссылку на сообщение в Telegram
 func generateTelegramLink(msg *telego.Message) string {
+	if msg == nil {
+		return "https://t.me/error_link"
+	}
+
 	chatID := msg.Chat.ID
 	messageID := msg.MessageID
 	username := msg.Chat.Username
 
 	formatChatID := func(id int64) string {
 		if id < 0 {
-			return strconv.FormatInt(-id, 10)[4:] // убираем -100
+			return strconv.FormatInt(-id, 10)[4:] // Убираем "-100" для приватных чатов
 		}
 		return strconv.FormatInt(id, 10)
 	}
 
-	// Найти корневой пост (если это ответ)
-	postID := messageID
+	// Для комментариев используем ID сообщения, на которое отвечаем
+	var postID int64
 	if msg.ReplyToMessage != nil {
-		current := msg.ReplyToMessage
-		for current.ReplyToMessage != nil {
-			current = current.ReplyToMessage
-		}
-		postID = current.MessageID
+		postID = int64(msg.ReplyToMessage.MessageID) // Берем именно родительское сообщение
+	} else {
+		postID = int64(messageID) // Для обычных сообщений
 	}
 
+	// Формируем базовую ссылку
 	var baseURL string
 	if username != "" {
 		baseURL = fmt.Sprintf("https://t.me/%s/%d", username, postID)
@@ -262,8 +259,8 @@ func generateTelegramLink(msg *telego.Message) string {
 		baseURL = fmt.Sprintf("https://t.me/c/%s/%d", formatChatID(chatID), postID)
 	}
 
-	// Добавляем ?comment= только если это группа комментариев
-	if isLikelyCommentGroup(&msg.Chat) {
+	// Добавляем параметр комментария, если это ответ
+	if msg.ReplyToMessage != nil {
 		return fmt.Sprintf("%s?comment=%d", baseURL, messageID)
 	}
 

@@ -44,6 +44,13 @@ func (bot *Bot) StartMonitoring(intervalMins int) {
 				log.Printf("Ошибка получения групп: %v", err)
 				continue
 			}
+
+			// Проверяем кэш при каждой итерации
+			err = bot.processPendingComments()
+			if err != nil {
+				log.Printf("Ошибка обработки кэшированных сообщений: %s", err)
+			}
+
 			log.Printf("Проверка %d групп...", len(groups))
 
 			for _, group := range groups {
@@ -83,9 +90,6 @@ func (bot *Bot) StartMonitoring(intervalMins int) {
 				// Обновляем время последней проверки
 				bot.conf.GetDB().UpdateLastCheck(group.ID, time.Now().Unix())
 			}
-
-			// Проверяем кэш при каждой итерации
-			bot.processPendingComments()
 		}
 	}(intervalMins)
 }
@@ -124,9 +128,28 @@ func processCommentText(text string) string {
 	return text
 }
 
+func escapeMarkdown(text string) string {
+	replacer := strings.NewReplacer(
+		"_", "\\_",
+		"*", "\\*",
+		"`", "\\`",
+		"[", "\\[",
+	)
+
+	return replacer.Replace(text)
+}
+
 func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment) {
 	for _, comment := range comments {
-		processedText := processCommentText(comment.Text)
+		// Экранируем текст и автора
+		safeText := escapeMarkdown(processCommentText(comment.Text))
+		safeAuthor := escapeMarkdown(comment.Author)
+		safeGroupName := escapeMarkdown(group.GroupName)
+		safeURL := escapeMarkdown(comment.PostURL)
+
+		if len([]rune(safeText)) > 1000 {
+			safeText = string([]rune(safeText)[:1000]) + "\n\n⚠️ Сообщение было обрезано."
+		}
 
 		status := "Только что"
 		if comment.IsPending {
@@ -135,17 +158,17 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 		}
 
 		msgText := fmt.Sprintf(
-			"💬 *Новый комментарий в %s (%s)*:\n\n"+
+			"💬 *Новый комментарий в \"%s\" (%s)*:\n\n"+
 				"👤 *Автор*: %s\n"+
 				"📝 *Текст*: %s\n"+
 				"🔗 *Ссылка*: [Перейти к посту](%s)\n"+
 				"⏰ *Время*: %s\n"+
 				"📌 *Статус оповещения*: %s",
-			group.GroupName,
+			safeGroupName,
 			group.Network,
-			comment.Author,
-			processedText,
-			comment.PostURL,
+			safeAuthor,
+			safeText,
+			safeURL,
 			time.Unix(comment.Timestamp, 0).Format("2006-01-02 15:04"),
 			status,
 		)
@@ -190,7 +213,7 @@ func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 		Text:       msg.Text,
 		Timestamp:  int64(msg.Date),
 		PostURL:    generateTelegramLink(msg),
-		IsPending:  false,
+		IsPending:  true,
 		ReceivedAt: time.Now().Unix(),
 	}
 
@@ -277,8 +300,14 @@ func (bot *Bot) processPendingComments() error {
 
 	// Отправляем и помечаем как отправленные
 	for _, c := range comments {
-		group, err := bot.db.GetGroupByNetworkAndID(c.Network, fmt.Sprintf("%d", c.GroupID))
+		group, err := bot.db.GetGroupByInternalID(fmt.Sprintf("%d", c.GroupID))
 		if err != nil {
+			continue
+		}
+
+		if group == nil {
+			log.Printf("Группа ID %d не найдена, удаляю комментарии", c.GroupID)
+			bot.db.Exec(`DELETE FROM comments WHERE group_id = ?`, c.GroupID)
 			continue
 		}
 
