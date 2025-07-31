@@ -58,13 +58,20 @@ func (bot *Bot) StartMonitoring(intervalMins int) {
 					continue
 				}
 
-				time.Sleep(time.Second * 3)
+				time.Sleep(time.Second * 5)
 
 				comments, err := bot.checkGroupComments(group)
 				if err != nil {
-					log.Printf("Ошибка проверки группы %s (%s): %v",
-						group.GroupName, group.Network, err)
-					continue
+					log.Printf("Ошибка проверки группы %s (%s): %v. Дополнительно ждем...",
+						group.GroupName, group.Network, err,
+					)
+
+					time.Sleep(time.Second * 15)
+					comments, err = bot.checkGroupComments(group)
+					if err != nil {
+						log.Printf("Ошибка дополнительной проверки %s: %s. Комментарии не проверены.", group.GroupName, err)
+						continue
+					}
 				}
 
 				if len(comments) > 0 {
