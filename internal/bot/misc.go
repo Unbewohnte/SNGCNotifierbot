@@ -232,7 +232,35 @@ func (bot *Bot) generateTelegramLink(msg *telego.Message) string {
 		return "https://t.me/error_link"
 	}
 
-	// Получаем полную информацию о чате сообщения
+	// Проверяем, является ли это комментарием (есть ReplyToMessage)
+	if msg.ReplyToMessage != nil {
+		// Ищем корневой пост (первое сообщение в цепочке)
+		rootPost := msg.ReplyToMessage
+		for rootPost.ReplyToMessage != nil {
+			rootPost = rootPost.ReplyToMessage
+		}
+
+		// Проверяем, является ли корневой пост пересылкой из канала
+		if rootPost.ForwardOrigin != nil {
+			if channelOrigin, ok := rootPost.ForwardOrigin.(*telego.MessageOriginChannel); ok {
+				// Формируем ссылку на комментарий
+				if channelOrigin.Chat.Username != "" {
+					return fmt.Sprintf("https://t.me/%s/%d?comment=%d",
+						channelOrigin.Chat.Username,
+						channelOrigin.MessageID,
+						msg.MessageID)
+				}
+				// Для приватных каналов без username
+				channelIDStr := formatChatID(channelOrigin.Chat.ID)
+				return fmt.Sprintf("https://t.me/c/%s/%d?comment=%d",
+					channelIDStr,
+					channelOrigin.MessageID,
+					msg.MessageID)
+			}
+		}
+	}
+
+	// Обычный режим (не комментарий)
 	chat, err := bot.api.GetChat(
 		context.Background(),
 		&telego.GetChatParams{
@@ -243,42 +271,13 @@ func (bot *Bot) generateTelegramLink(msg *telego.Message) string {
 		return "https://t.me/error_link"
 	}
 
-	// Для комментариев используем ID сообщения, на которое отвечаем
-	var postID int64
-	if msg.ReplyToMessage != nil {
-		postID = int64(msg.ReplyToMessage.MessageID)
-	} else {
-		postID = int64(msg.MessageID)
+	if chat.Username != "" {
+		return fmt.Sprintf("https://t.me/%s/%d", chat.Username, msg.MessageID)
 	}
 
-	// Формируем ссылку в зависимости от типа чата
-	switch {
-	case chat.Username != "":
-		// Публичный канал/группа
-		if msg.ReplyToMessage != nil {
-			return fmt.Sprintf("https://t.me/%s/%d?comment=%d",
-				chat.Username,
-				postID,
-				msg.MessageID,
-			)
-		}
-		return fmt.Sprintf("https://t.me/%s/%d", chat.Username, postID)
+	formattedID := formatChatID(chat.ID)
 
-	case chat.Type == "supergroup" || chat.Type == "group":
-		// Приватная группа
-		formattedID := formatChatID(chat.ID)
-		if msg.ReplyToMessage != nil {
-			return fmt.Sprintf("https://t.me/c/%s/%d?comment=%d",
-				formattedID,
-				postID,
-				msg.MessageID,
-			)
-		}
-		return fmt.Sprintf("https://t.me/c/%s/%d", formattedID, postID)
-
-	default:
-		return "https://t.me/error_link"
-	}
+	return fmt.Sprintf("https://t.me/c/%s/%d", formattedID, msg.MessageID)
 }
 
 func formatChatID(id int64) string {
