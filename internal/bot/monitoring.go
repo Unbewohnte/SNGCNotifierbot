@@ -219,7 +219,7 @@ func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 		Author:     formatUserName(msg.From),
 		Text:       msg.Text,
 		Timestamp:  int64(msg.Date),
-		PostURL:    generateTelegramLink(msg),
+		PostURL:    bot.generateTelegramLink(msg),
 		IsPending:  false,
 		ReceivedAt: time.Now().Unix(),
 	}

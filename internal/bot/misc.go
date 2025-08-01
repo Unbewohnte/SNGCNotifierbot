@@ -227,42 +227,74 @@ func formatUserName(user *telego.User) string {
 }
 
 // Генерирует ссылку на сообщение в Telegram
-func generateTelegramLink(msg *telego.Message) string {
+func (bot *Bot) generateTelegramLink(msg *telego.Message) string {
 	if msg == nil {
 		return "https://t.me/error_link"
 	}
 
-	chatID := msg.Chat.ID
-	messageID := msg.MessageID
-	username := msg.Chat.Username
+	// Получаем полную информацию о чате
+	chat, err := bot.api.GetChat(
+		context.Background(),
+		&telego.GetChatParams{
+			ChatID: telego.ChatID{ID: msg.Chat.ID},
+		},
+	)
+	if err != nil {
+		log.Printf("Ошибка получения чата: %v", err)
+		return "https://t.me/error_link"
+	}
 
+	// Пытаемся определить связанный канал
+	var channelUsername string
+	if chat.LinkedChatID != 0 {
+		linkedChat, err := bot.api.GetChat(
+			context.Background(),
+			&telego.GetChatParams{
+				ChatID: telego.ChatID{ID: chat.LinkedChatID},
+			},
+		)
+		if err == nil && linkedChat.Username != "" {
+			channelUsername = linkedChat.Username
+		}
+	}
+
+	// Формируем ссылку
+	if channelUsername != "" {
+		if msg.ReplyToMessage != nil {
+			return fmt.Sprintf("https://t.me/%s/%d?comment=%d",
+				channelUsername,
+				msg.ReplyToMessage.MessageID,
+				msg.MessageID,
+			)
+		}
+		return fmt.Sprintf("https://t.me/%s/%d", channelUsername, msg.MessageID)
+	}
+
+	// Стандартная генерация ссылки
 	formatChatID := func(id int64) string {
 		if id < 0 {
-			return strconv.FormatInt(-id, 10)[4:] // Убираем "-100" для приватных чатов
+			return strconv.FormatInt(-id, 10)[4:] // Убираем "-100"
 		}
 		return strconv.FormatInt(id, 10)
 	}
 
-	// Для комментариев используем ID сообщения, на которое отвечаем
-	var postID int64
+	if chat.Username != "" {
+		if msg.ReplyToMessage != nil {
+			return fmt.Sprintf("https://t.me/%s/%d?comment=%d",
+				chat.Username,
+				msg.ReplyToMessage.MessageID,
+				msg.MessageID,
+			)
+		}
+		return fmt.Sprintf("https://t.me/%s/%d", chat.Username, msg.MessageID)
+	}
+
 	if msg.ReplyToMessage != nil {
-		postID = int64(msg.ReplyToMessage.MessageID) // Берем именно родительское сообщение
-	} else {
-		postID = int64(messageID) // Для обычных сообщений
+		return fmt.Sprintf("https://t.me/c/%s/%d?comment=%d",
+			formatChatID(chat.ID),
+			msg.ReplyToMessage.MessageID,
+			msg.MessageID,
+		)
 	}
-
-	// Формируем базовую ссылку
-	var baseURL string
-	if username != "" {
-		baseURL = fmt.Sprintf("https://t.me/%s/%d", username, postID)
-	} else {
-		baseURL = fmt.Sprintf("https://t.me/c/%s/%d", formatChatID(chatID), postID)
-	}
-
-	// Добавляем параметр комментария, если это ответ
-	if msg.ReplyToMessage != nil {
-		return fmt.Sprintf("%s?comment=%d", baseURL, messageID)
-	}
-
-	return baseURL
+	return fmt.Sprintf("https://t.me/c/%s/%d", formatChatID(chat.ID), msg.MessageID)
 }
