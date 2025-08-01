@@ -232,69 +232,58 @@ func (bot *Bot) generateTelegramLink(msg *telego.Message) string {
 		return "https://t.me/error_link"
 	}
 
-	// Получаем полную информацию о чате
+	// Получаем полную информацию о чате сообщения
 	chat, err := bot.api.GetChat(
 		context.Background(),
 		&telego.GetChatParams{
 			ChatID: telego.ChatID{ID: msg.Chat.ID},
-		},
-	)
+		})
 	if err != nil {
 		log.Printf("Ошибка получения чата: %v", err)
 		return "https://t.me/error_link"
 	}
 
-	// Пытаемся определить связанный канал
-	var channelUsername string
-	if chat.LinkedChatID != 0 {
-		linkedChat, err := bot.api.GetChat(
-			context.Background(),
-			&telego.GetChatParams{
-				ChatID: telego.ChatID{ID: chat.LinkedChatID},
-			},
-		)
-		if err == nil && linkedChat.Username != "" {
-			channelUsername = linkedChat.Username
-		}
+	// Для комментариев используем ID сообщения, на которое отвечаем
+	var postID int64
+	if msg.ReplyToMessage != nil {
+		postID = int64(msg.ReplyToMessage.MessageID)
+	} else {
+		postID = int64(msg.MessageID)
 	}
 
-	// Формируем ссылку
-	if channelUsername != "" {
-		if msg.ReplyToMessage != nil {
-			return fmt.Sprintf("https://t.me/%s/%d?comment=%d",
-				channelUsername,
-				msg.ReplyToMessage.MessageID,
-				msg.MessageID,
-			)
-		}
-		return fmt.Sprintf("https://t.me/%s/%d", channelUsername, msg.MessageID)
-	}
-
-	// Стандартная генерация ссылки
-	formatChatID := func(id int64) string {
-		if id < 0 {
-			return strconv.FormatInt(-id, 10)[4:] // Убираем "-100"
-		}
-		return strconv.FormatInt(id, 10)
-	}
-
-	if chat.Username != "" {
+	// Формируем ссылку в зависимости от типа чата
+	switch {
+	case chat.Username != "":
+		// Публичный канал/группа
 		if msg.ReplyToMessage != nil {
 			return fmt.Sprintf("https://t.me/%s/%d?comment=%d",
 				chat.Username,
-				msg.ReplyToMessage.MessageID,
+				postID,
 				msg.MessageID,
 			)
 		}
-		return fmt.Sprintf("https://t.me/%s/%d", chat.Username, msg.MessageID)
-	}
+		return fmt.Sprintf("https://t.me/%s/%d", chat.Username, postID)
 
-	if msg.ReplyToMessage != nil {
-		return fmt.Sprintf("https://t.me/c/%s/%d?comment=%d",
-			formatChatID(chat.ID),
-			msg.ReplyToMessage.MessageID,
-			msg.MessageID,
-		)
+	case chat.Type == "supergroup" || chat.Type == "group":
+		// Приватная группа
+		formattedID := formatChatID(chat.ID)
+		if msg.ReplyToMessage != nil {
+			return fmt.Sprintf("https://t.me/c/%s/%d?comment=%d",
+				formattedID,
+				postID,
+				msg.MessageID,
+			)
+		}
+		return fmt.Sprintf("https://t.me/c/%s/%d", formattedID, postID)
+
+	default:
+		return "https://t.me/error_link"
 	}
-	return fmt.Sprintf("https://t.me/c/%s/%d", formatChatID(chat.ID), msg.MessageID)
+}
+
+func formatChatID(id int64) string {
+	if id < 0 {
+		return strconv.FormatInt(-id, 10)[4:] // Убираем "-100"
+	}
+	return strconv.FormatInt(id, 10)
 }
