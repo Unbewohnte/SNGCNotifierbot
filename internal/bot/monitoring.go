@@ -152,7 +152,6 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 		safeText := escapeMarkdown(processCommentText(comment.Text))
 		safeAuthor := escapeMarkdown(comment.Author)
 		safeGroupName := escapeMarkdown(group.GroupName)
-		safeURL := escapeMarkdown(comment.PostURL)
 
 		if len([]rune(safeText)) > 1000 {
 			safeText = string([]rune(safeText)[:1000]) + "\n\n⚠️ Сообщение было обрезано."
@@ -169,13 +168,13 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 				"👤 *Автор*: %s\n"+
 				"📝 *Текст*: %s\n"+
 				"🔗 *Ссылка*: [Перейти к посту](%s)\n"+
-				"⏰ *Время*: %s\n"+
+				"⏰ *Время публикации комментария*: %s\n"+
 				"📌 *Статус оповещения*: %s",
 			safeGroupName,
 			group.Network,
 			safeAuthor,
 			safeText,
-			safeURL,
+			comment.PostURL,
 			time.Unix(comment.Timestamp, 0).Format("2006-01-02 15:04"),
 			status,
 		)
@@ -213,6 +212,10 @@ func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 	}
 
 	// Формируем комментарий
+	if msg.Text == "" && msg.Caption != "" {
+		msg.Text = msg.Caption
+	}
+
 	comment := db.Comment{
 		ID:         fmt.Sprintf("tg-%d", msg.MessageID),
 		CommentID:  fmt.Sprintf("%d", msg.MessageID),
