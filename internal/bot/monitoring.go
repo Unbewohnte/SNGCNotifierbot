@@ -146,24 +146,114 @@ func escapeMarkdown(text string) string {
 	return replacer.Replace(text)
 }
 
-func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment) {
-	for _, comment := range comments {
-		// Экранируем текст и автора
-		safeText := escapeMarkdown(processCommentText(comment.Text))
-		safeAuthor := escapeMarkdown(comment.Author)
-		safeGroupName := escapeMarkdown(group.GroupName)
+func formatTimeAgo(timestamp int64) string {
+	ago := time.Since(time.Unix(timestamp, 0))
 
-		if len([]rune(safeText)) > 1000 {
-			safeText = string([]rune(safeText)[:1000]) + "\n\n⚠️ Сообщение было обрезано."
+	switch {
+	case ago.Seconds() < 10:
+		return "только что"
+	case ago.Minutes() < 1:
+		return fmt.Sprintf("%d сек назад", int(ago.Seconds()))
+	case ago.Hours() < 1:
+		return fmt.Sprintf("%d мин назад", int(ago.Minutes()))
+	case ago.Hours() < 24:
+		return fmt.Sprintf("%d ч назад", int(ago.Hours()))
+	default:
+		return "давно"
+	}
+}
+
+func (bot *Bot) constructNotificationMessage(group db.MonitoredGroup, comment db.Comment) string {
+	safeAuthor := escapeMarkdown(comment.Author)
+	safeGroupName := escapeMarkdown(group.GroupName)
+	if len([]rune(comment.Text)) > 500 {
+		comment.Text = string([]rune(comment.Text)[:500]) + "\n\n⚠️ Сообщение было обрезано."
+	}
+	safeText := escapeMarkdown(processCommentText(comment.Text))
+
+	status := "Только что"
+	if comment.IsPending {
+		status = "Отправлено с задержкой: (комментарий получен в нерабочее время)"
+	}
+
+	// Форматируем время в человекочитаемый вид
+	commentTime := time.Unix(comment.Timestamp, 0)
+	var timeStr string
+	if commentTime.Day() == time.Now().Day() && commentTime.Month() == time.Now().Month() && commentTime.Year() == time.Now().Year() {
+		timeStr = commentTime.Format("сегодня в 15:04")
+	} else {
+		timeStr = commentTime.Format("02.01.2006 в 15:04")
+	}
+
+	var msgText string
+	switch bot.conf.NotificationMessageType {
+	case NOTIFICATION_FULL:
+		msgText = fmt.Sprintf(
+			"💬 *Новый комментарий в \"%s\" (%s)*:\n\n"+
+				"📝 *Текст*: %s\n\n"+
+				"👤 *Автор*: %s\n"+
+				"🔗 *Ссылка*: [Перейти к посту](%s)\n"+
+				"⏰ *Время публикации комментария*: %s\n"+
+				"📌 *Статус оповещения*: %s",
+			safeGroupName,
+			group.Network,
+			safeText,
+			safeAuthor,
+			comment.PostURL,
+			timeStr,
+			status,
+		)
+	case NOTIFICATION_MINIMALISTIC:
+		// Определяем иконку сети
+		networkIcon := "🌐"
+		if group.Network == "tg" {
+			networkIcon = "✈️"
 		}
 
-		status := "Только что"
-		if comment.IsPending {
-			status = fmt.Sprintf("Отправлено с задержкой: %s (комментарий получен в нерабочее время)",
-				time.Unix(comment.Timestamp, 0).Format("2006-01-02 15:04"))
-		}
+		ago := formatTimeAgo(comment.Timestamp)
 
-		msgText := fmt.Sprintf(
+		// Обрезаем текст комментария для минималистичного вида
+		msgText = fmt.Sprintf(
+			"%s *%s*\n"+
+				"💬 %s\n"+
+				"⏰ %s | (статус: %s)\n"+
+				"👤 *%s*\n"+
+				"🔗 [Перейти к посту](%s) • %s",
+			networkIcon,
+			group.GroupName,
+			safeText,
+			timeStr,
+			status,
+			safeAuthor,
+			comment.PostURL,
+			ago,
+		)
+
+	case NOTIFICATION_SPACED:
+		// Добавляем визуальные разделители и отступы
+		divider := strings.Repeat("•", 35) + "\n"
+
+		msgText = fmt.Sprintf(
+			"*💬 НОВЫЙ КОММЕНТАРИЙ*\n"+
+				"*Группа:* _%s_ (%s)\n"+
+				divider+
+				"*📝 Текст комментария:*\n%s\n"+
+				divider+
+				"*👤 Автор:* %s\n"+
+				"*⏰ Время:* %s\n"+
+				"*📌 Статус:* %s\n"+
+				"*🔗 Ссылка:* [Перейти к посту](%s)",
+			safeGroupName,
+			group.Network,
+			safeText,
+			safeAuthor,
+			timeStr,
+			status,
+			comment.PostURL,
+		)
+
+	default:
+		msgText = fmt.Sprintf(
 			"💬 *Новый комментарий в \"%s\" (%s)*:\n\n"+
 				"👤 *Автор*: %s\n"+
 				"📝 *Текст*: %s\n"+
@@ -178,6 +268,14 @@ func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment
 			time.Unix(comment.Timestamp, 0).Format("2006-01-02 15:04"),
 			status,
 		)
+	}
+
+	return msgText
+}
+
+func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment) {
+	for _, comment := range comments {
+		msgText := bot.constructNotificationMessage(group, comment)
 
 		params := &telego.SendMessageParams{
 			ChatID:    telego.ChatID{ID: bot.conf.Telegram.MonitoringChannelID},

@@ -70,15 +70,22 @@ type ScheduleConfig struct {
 	Timezone   string   `json:"timezone"`     // "Europe/Moscow"
 }
 
+const (
+	NOTIFICATION_FULL = iota
+	NOTIFICATION_MINIMALISTIC
+	NOTIFICATION_SPACED
+)
+
 type Config struct {
-	Telegram             TelegramConf   `json:"telegram"`
-	Debug                bool           `json:"debug"`
-	DB                   DBConf         `json:"database"`
-	Social               SocialConfig   `json:"socials"`
-	AllowEmptyComments   bool           `json:"allow_empty_comments"`
-	Schedule             ScheduleConfig `json:"schedule"`
-	CheckIntervalMinutes int            `json:"check_interval_minutes"`
-	LogsFile             string         `json:"logs_file"`
+	Telegram                TelegramConf   `json:"telegram"`
+	Debug                   bool           `json:"debug"`
+	DB                      DBConf         `json:"database"`
+	Social                  SocialConfig   `json:"socials"`
+	AllowEmptyComments      bool           `json:"allow_empty_comments"`
+	Schedule                ScheduleConfig `json:"schedule"`
+	CheckIntervalMinutes    int            `json:"check_interval_minutes"`
+	LogsFile                string         `json:"logs_file"`
+	NotificationMessageType int            `json:"notification_message_type"`
 }
 
 func (c *Config) OpenDB() (*db.DB, error) {

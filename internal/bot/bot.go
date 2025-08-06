@@ -208,6 +208,21 @@ func (bot *Bot) Init() {
 		Group:       "Общее",
 		Call:        bot.SendLogs,
 	})
+
+	bot.NewCommand(Command{
+		Name:        "setnotificationtype",
+		Description: "Установить вид текста оповещения",
+		Group:       "Общее",
+		Call:        bot.SetNotificationType,
+	})
+
+	bot.NewCommand(Command{
+		Name:        "listnotificationtypes",
+		Description: "Перечислить доступные виды текста оповещения",
+		Group:       "Общее",
+		Call:        bot.ListNotificationTypes,
+	})
+
 }
 
 func (bot *Bot) Start() error {
