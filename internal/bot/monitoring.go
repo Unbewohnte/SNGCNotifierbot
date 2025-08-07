@@ -204,22 +204,16 @@ func (bot *Bot) constructNotificationMessage(group db.MonitoredGroup, comment db
 			status,
 		)
 	case NOTIFICATION_MINIMALISTIC:
-		// Определяем иконку сети
-		networkIcon := "🌐"
-		if group.Network == "tg" {
-			networkIcon = "✈️"
-		}
-
 		ago := formatTimeAgo(comment.Timestamp)
 
 		// Обрезаем текст комментария для минималистичного вида
 		msgText = fmt.Sprintf(
-			"%s *%s*\n"+
+			"🌐 (%s) *%s*\n"+
 				"💬 %s\n"+
 				"⏰ %s | (статус: %s)\n"+
 				"👤 *%s*\n"+
 				"🔗 [Перейти к посту](%s) • %s",
-			networkIcon,
+			group.Network,
 			group.GroupName,
 			safeText,
 			timeStr,
