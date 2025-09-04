@@ -33,7 +33,7 @@ import (
 
 const (
 	apiVersion = "5.131"
-	apiURL     = "https://api.vk.com/method/"
+	apiURL     = "https://api.vk.ru/method/"
 )
 
 type Client struct {

@@ -144,7 +144,7 @@ func (c *Client) getNewPostComments(ctx context.Context, groupID string, postID 
 	}
 
 	var comments []db.Comment
-	postURL := fmt.Sprintf("https://vk.com/wall-%s_%d", groupID, postID)
+	postURL := fmt.Sprintf("https://vk.ru/wall-%s_%d", groupID, postID)
 
 	for _, comment := range result.Items {
 		if comment.Date <= lastCheck {

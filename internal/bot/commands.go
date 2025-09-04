@@ -219,6 +219,7 @@ func normalizeVKGroupID(input string) (string, error) {
 	// Извлекаем последнюю часть из URL (если это ссылка)
 	if strings.HasPrefix(input, "https://") ||
 		strings.HasPrefix(input, "http://") ||
+		strings.HasPrefix(input, "vk.ru") ||
 		strings.HasPrefix(input, "vk.com") {
 
 		// Разбиваем URL на части
