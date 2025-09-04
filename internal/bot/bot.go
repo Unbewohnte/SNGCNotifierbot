@@ -223,6 +223,35 @@ func (bot *Bot) Init() {
 		Call:        bot.ListNotificationTypes,
 	})
 
+	bot.NewCommand(Command{
+		Name:        "addspamkeyword",
+		Description: "Добавить ключевое слово для фильтрации спама",
+		Example:     "/addspamkeyword заработок",
+		Group:       "Спам-фильтр",
+		Call:        bot.AddSpamKeyword,
+	})
+
+	bot.NewCommand(Command{
+		Name:        "removespamkeyword",
+		Description: "Удалить ключевое слово из фильтрации спама",
+		Example:     "/removespamkeyword заработок",
+		Group:       "Спам-фильтр",
+		Call:        bot.RemoveSpamKeyword,
+	})
+
+	bot.NewCommand(Command{
+		Name:        "listspamkeywords",
+		Description: "Показать все ключевые слова для фильтрации спама",
+		Group:       "Спам-фильтр",
+		Call:        bot.ListSpamKeywords,
+	})
+
+	bot.NewCommand(Command{
+		Name:        "togglefilterspam",
+		Description: "Включить или выключить фильтрацию спам-комментариев",
+		Group:       "Спам-фильтр",
+		Call:        bot.ToggleFilterSpam,
+	})
 }
 
 func (bot *Bot) Start() error {

@@ -76,6 +76,11 @@ const (
 	NOTIFICATION_SPACED
 )
 
+type SpamConfig struct {
+	FilterSpam bool     `json:"filter_spam"`
+	Keywords   []string `json:"spam_keywords"`
+}
+
 type Config struct {
 	Telegram                TelegramConf   `json:"telegram"`
 	Debug                   bool           `json:"debug"`
@@ -86,6 +91,7 @@ type Config struct {
 	CheckIntervalMinutes    int            `json:"check_interval_minutes"`
 	LogsFile                string         `json:"logs_file"`
 	NotificationMessageType int            `json:"notification_message_type"`
+	Spam                    SpamConfig     `json:"spam"`
 }
 
 func (c *Config) OpenDB() (*db.DB, error) {
@@ -136,6 +142,31 @@ func DefaultConfig() *Config {
 		},
 		CheckIntervalMinutes: 10,
 		LogsFile:             "logs.txt",
+		Spam: SpamConfig{
+			FilterSpam: true,
+			Keywords: []string{
+				"халтурка",
+				"подработка",
+				"оплата на руки",
+				"пиши в лс",
+				"зароботок",
+				"заработок",
+				"не выходя из дома",
+				"100$",
+				"на пару часов",
+				"деньги сегодня",
+				"зароботку",
+				"подработку",
+				"оплата сразу",
+				"в лс",
+				"личные сообщения",
+				"команду по зароботку",
+				"доход не выходя из дома",
+				"свыше 100$",
+				"обучение бесплатно",
+				"берём только 18+",
+			},
+		},
 	}
 }
 

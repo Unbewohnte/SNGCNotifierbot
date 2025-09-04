@@ -286,3 +286,18 @@ func formatChatID(id int64) string {
 	}
 	return strconv.FormatInt(id, 10)
 }
+
+func (bot *Bot) isSpam(text string) bool {
+	// If spam filtering is disabled, nothing is spam
+	if !bot.conf.Spam.FilterSpam {
+		return false
+	}
+
+	text = strings.ToLower(text)
+	for _, keyword := range bot.conf.Spam.Keywords {
+		if strings.Contains(text, strings.ToLower(keyword)) {
+			return true
+		}
+	}
+	return false
+}

@@ -269,6 +269,12 @@ func (bot *Bot) constructNotificationMessage(group db.MonitoredGroup, comment db
 
 func (bot *Bot) notifyNewComments(group db.MonitoredGroup, comments []db.Comment) {
 	for _, comment := range comments {
+		// Check if comment is spam
+		if bot.isSpam(comment.Text) {
+			log.Printf("Пропускаем спам-комментарий в %s: %s", group.GroupName, comment.Text)
+			continue
+		}
+
 		msgText := bot.constructNotificationMessage(group, comment)
 
 		params := &telego.SendMessageParams{
@@ -306,6 +312,12 @@ func (bot *Bot) handleTelegramComment(msg *telego.Message) {
 	// Формируем комментарий
 	if msg.Text == "" && msg.Caption != "" {
 		msg.Text = msg.Caption
+	}
+
+	// Check if message is spam
+	if bot.isSpam(msg.Text) {
+		log.Printf("Пропускаем спам-сообщение в Telegram от %d: %s", msg.From.ID, msg.Text)
+		return
 	}
 
 	comment := db.Comment{

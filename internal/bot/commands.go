@@ -209,6 +209,10 @@ func (bot *Bot) PrintConfig(message *telego.Message) {
 	response += "\n*[Расписание]*:\n"
 	response += fmt.Sprintf("*Оповещения по расписанию включены?*: `%+v`\n", bot.conf.Schedule.Enabled)
 
+	response += "\n*[СПАМ ФИЛЬТР]*:\n"
+	response += fmt.Sprintf("*Фильтровать спам?*: `%v`\n", bot.conf.Spam.FilterSpam)
+	response += fmt.Sprintf("*Ключевые слова*: `%v`\n", bot.conf.Spam.Keywords)
+
 	bot.answerBack(message, response, true)
 }
 
@@ -848,4 +852,90 @@ func (bot *Bot) SetNotificationType(message *telego.Message) {
 			newTypeName),
 		true,
 	)
+}
+
+func (bot *Bot) AddSpamKeyword(message *telego.Message) {
+	parts := strings.Split(strings.TrimSpace(message.Text), " ")
+	if len(parts) < 2 {
+		bot.sendError(message, "Ключевое слово не указано")
+		return
+	}
+
+	keyword := strings.Join(parts[1:], " ")
+
+	// Check if keyword already exists
+	for _, kw := range bot.conf.Spam.Keywords {
+		if strings.EqualFold(kw, keyword) {
+			bot.sendError(message, "Это ключевое слово уже есть в списке")
+			return
+		}
+	}
+
+	bot.conf.Spam.Keywords = append(bot.conf.Spam.Keywords, keyword)
+	bot.conf.Update()
+	bot.sendSuccess(message, "Ключевое слово добавлено в фильтр спама")
+}
+
+func (bot *Bot) RemoveSpamKeyword(message *telego.Message) {
+	parts := strings.Split(strings.TrimSpace(message.Text), " ")
+	if len(parts) < 2 {
+		bot.sendError(message, "Ключевое слово не указано")
+		return
+	}
+
+	keyword := strings.Join(parts[1:], " ")
+	newKeywords := []string{}
+
+	for _, kw := range bot.conf.Spam.Keywords {
+		if !strings.EqualFold(kw, keyword) {
+			newKeywords = append(newKeywords, kw)
+		}
+	}
+
+	if len(newKeywords) == len(bot.conf.Spam.Keywords) {
+		bot.sendError(message, "Ключевое слово не найдено в списке")
+		return
+	}
+
+	bot.conf.Spam.Keywords = newKeywords
+	bot.conf.Update()
+	bot.sendSuccess(message, "Ключевое слово удалено из фильтра спама")
+}
+
+func (bot *Bot) ListSpamKeywords(message *telego.Message) {
+	if len(bot.conf.Spam.Keywords) == 0 {
+		bot.answerBack(message, "Список ключевых слов для фильтрации спама пуст", true)
+		return
+	}
+
+	response := "📋 Ключевые слова для фильтрации спама:\n\n"
+	for i, keyword := range bot.conf.Spam.Keywords {
+		response += fmt.Sprintf("%d. `%s`\n", i+1, keyword)
+	}
+
+	bot.answerBack(message, response, true)
+}
+
+func (bot *Bot) ToggleFilterSpam(message *telego.Message) {
+	if bot.conf.Spam.FilterSpam {
+		bot.conf.Spam.FilterSpam = false
+		bot.answerBack(message, "❌ Фильтрация спама отключена. Все комментарии будут приходить, включая потенциальный спам.", true)
+	} else {
+		bot.conf.Spam.FilterSpam = true
+		bot.answerBack(message, "✅ Фильтрация спама включена. Спам-комментарии будут отфильтровываться.", true)
+	}
+
+	// Update configuration file
+	if err := bot.conf.Update(); err != nil {
+		log.Printf("Ошибка сохранения конфигурации при переключении фильтра спама: %v", err)
+		bot.sendError(message, "Ошибка сохранения настроек: "+err.Error())
+		return
+	}
+
+	// Show current status
+	status := "выключена"
+	if bot.conf.Spam.FilterSpam {
+		status = "включена"
+	}
+	bot.answerBack(message, fmt.Sprintf("Текущий статус фильтрации спама: *%s*\nКоличество ключевых слов: *%d*", status, len(bot.conf.Spam.Keywords)), false)
 }
